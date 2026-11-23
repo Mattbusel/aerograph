@@ -1,0 +1,26 @@
+[package]
+name = "aerograph-fusion"
+description = "Shared decode + cross-node fusion + spoofer triangulation for the Aerograph grid. Real remoteid / remoteid-sentinel / misb code, run byte-identical on the aggregator and in the browser (wasm)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+remoteid.workspace = true
+remoteid-sentinel.workspace = true
+misb.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+# `sim` pulls in the scenario generator so the aggregator, the tests and the
+# wasm core can all build the same labelled city-mesh simulation.
+remoteid-scenario = { workspace = true, optional = true }
+
+[features]
+default = ["sim"]
+sim = ["dep:remoteid-scenario"]
+
+[dev-dependencies]
+remoteid-scenario.workspace = true

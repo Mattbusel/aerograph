@@ -1,0 +1,26 @@
+[package]
+name = "aerograph-aggregator"
+description = "Aerograph aggregator: axum service that ingests DetectionReports from many nodes, fuses them into one live entity per drone with the real remoteid / remoteid-sentinel / misb code, triangulates spoof floods to the operating radio, and serves the live grid as JSON, a WebSocket and a Cursor-on-Target stream."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "aerograph-aggregator"
+path = "src/main.rs"
+
+[dependencies]
+aerograph-fusion = { path = "../fusion", features = ["sim"] }
+uas-cot.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+axum = { version = "0.7.9", features = ["ws"] }
+tokio = { version = "1.40.0", features = ["rt-multi-thread", "macros", "sync", "time", "signal"] }
+tower-http = { version = "0.6.2", features = ["cors"] }
+
+[dev-dependencies]
+remoteid-scenario.workspace = true
+ureq = { version = "2.12.1", default-features = false, features = ["json"] }

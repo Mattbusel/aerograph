@@ -1,0 +1,33 @@
+[package]
+name = "aerograph-core"
+version = "0.1.0"
+authors = ["Matt Busel <matt@busel.dev>"]
+edition = "2021"
+rust-version = "1.75"
+description = "Aerograph wasm fusion core. Compiles the REAL Remote ID decode + sentinel fusion + misb aimpoint + spoofer triangulation (the shared aerograph-fusion crate) to WebAssembly and runs it in the browser over a labeled live simulation of a city sensor mesh. The simulation is only the INPUT; the decode and fusion are the production crate code, byte-identical to the server aggregator."
+license = "MIT"
+repository = "https://github.com/Mattbusel/aerograph"
+keywords = ["remote-id", "drone", "counter-uas", "spoofing", "wasm"]
+categories = ["aerospace::drones", "wasm"]
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# The shared, real decode + fusion + triangulation + city-mesh sim. The server
+# aggregator uses the same crate, so the browser and the server run
+# byte-identical fusion.
+aerograph-fusion = { path = "../fusion", features = ["sim"] }
+# Used only to build a real MISB 0601 packet and parse it back, so the camera
+# aimpoint the map shows is a number the misb crate actually produced.
+misb = "0.5.0"
+wasm-bindgen = "=0.2.129"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"

@@ -1,0 +1,33 @@
+[workspace]
+resolver = "2"
+members = ["fusion", "node", "aggregator"]
+# /core (the wasm fusion core) is built by a separate agent and manages its own
+# manifest. It depends on `aerograph-fusion` by path. It is excluded here so the
+# backend workspace builds green on its own.
+exclude = ["core"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["Matt Busel <matt@busel.dev>"]
+repository = "https://github.com/Mattbusel/aerograph"
+rust-version = "1.75"
+
+# One remoteid across the whole tree. remoteid-sentinel 0.2.0,
+# remoteid-scenario 0.1.0 and uas-cot 0.7.0 all require remoteid ^0.3.x, so the
+# decoded types (Observation, Transmitter, Assessment) only unify when the
+# direct dependency is pinned to the same 0.3 line. This is the proven
+# remoteid-web combination.
+[workspace.dependencies]
+remoteid = { version = "0.3.3", default-features = false, features = ["std", "serde"] }
+remoteid-scenario = "0.1.0"
+remoteid-sentinel = "0.2.0"
+misb = "0.5.0"
+uas-cot = { version = "0.7.0", default-features = false, features = ["remoteid", "misb"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+opt-level = 3
+lto = true
