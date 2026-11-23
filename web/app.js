@@ -128,7 +128,7 @@ map.on("load", () => {
       "circle-radius": ["case", ["get", "sel"], 7.5, ["case", ["get", "real"], 6.5, 5]],
       "circle-color": ["get", "color"],
       "circle-stroke-color": ["case", ["get", "sel"], "#ffffff", ["case", ["get", "real"], C.real, "rgba(255,255,255,0.5)"]],
-      "circle-stroke-width": ["case", ["get", "sel"], 2.2, ["case", ["get", "real"], 2, 1] },
+      "circle-stroke-width": ["case", ["get", "sel"], 2.2, ["case", ["get", "real"], 2, 1]] },
   });
 
   // interaction
