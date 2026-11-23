@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Aerograph — Live Drone Grid | Tensorust</title>
+<meta name="description" content="A live, open map of every drone in the sky and what it is actually doing. Real Remote ID decode, trust scoring and spoofer triangulation, running in your browser over a labelled live simulation of a city sensor mesh." />
+<meta property="og:title" content="Aerograph — every drone, decoded. Not dots, dossiers." />
+<meta property="og:description" content="Watch a spoof flood of hundreds of fake drones collapse to a single pin on the operator radio. Built on a mesh of $6 open-source sensors." />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://tensorust.com/grid" />
+<meta name="twitter:card" content="summary_large_image" />
+<style>
+  :root {
+    --bg: #05070d;
+    --fg: #e8eef7;
+    --muted: #8a97ad;
+    --line: #1a2334;
+    --accent: #ffcf4a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
+    font-family: "Inter", system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  body { display: flex; flex-direction: column; min-height: 100vh; }
+  header.bar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; padding: 12px 20px; border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, #0a0e18, #05070d); flex-wrap: wrap;
+  }
+  .brand { display: flex; align-items: baseline; gap: 12px; }
+  .brand b { font-size: 18px; letter-spacing: 0.02em; }
+  .brand span { color: var(--muted); font-size: 13px; }
+  .brand .dot { width: 8px; height: 8px; border-radius: 50%; background: #2ec27e;
+    display: inline-block; box-shadow: 0 0 8px #2ec27e; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+  nav a { color: var(--fg); text-decoration: none; font-size: 13px; margin-left: 18px;
+    opacity: 0.85; } nav a:hover { opacity: 1; color: var(--accent); }
+  .frame-wrap { position: relative; flex: 1 1 auto; min-height: 60vh; }
+  iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; }
+  footer.note { padding: 10px 20px; border-top: 1px solid var(--line);
+    color: var(--muted); font-size: 12px; line-height: 1.5; }
+  footer.note b { color: var(--fg); }
+  footer.note a { color: var(--accent); text-decoration: none; }
+</style>
+</head>
+<body>
+  <header class="bar">
+    <div class="brand">
+      <b>Aerograph</b>
+      <span><span class="dot"></span> live drone grid — every drone, decoded. Not dots, dossiers.</span>
+    </div>
+    <nav>
+      <a href="https://mattbusel.github.io/aerograph/" target="_blank" rel="noopener">Full screen</a>
+      <a href="https://github.com/Mattbusel/aerograph" target="_blank" rel="noopener">Source + $6 node</a>
+    </nav>
+  </header>
+
+  <div class="frame-wrap">
+    <iframe
+      src="https://mattbusel.github.io/aerograph/"
+      title="Aerograph live drone grid"
+      loading="lazy"
+      allow="geolocation"
+      referrerpolicy="no-referrer-when-downgrade"></iframe>
+  </div>
+
+  <footer class="note">
+    <b>Live simulation of the grid.</b> The decode, trust scoring, flood detection and
+    spoofer triangulation are the real Rust crates
+    (<a href="https://crates.io/crates/remoteid">remoteid</a>,
+    <a href="https://crates.io/crates/remoteid-sentinel">remoteid-sentinel</a>,
+    <a href="https://crates.io/crates/misb">misb</a>,
+    <a href="https://crates.io/crates/uas-cot">uas-cot</a>) compiled to WebAssembly and run in your
+    browser. Only the city traffic is simulated. Point a mesh of $6 open-source sensors at a real
+    aggregator and the same fusion runs on real drones.
+    <a href="https://github.com/Mattbusel/aerograph">Build a node.</a>
+  </footer>
+</body>
+</html>
