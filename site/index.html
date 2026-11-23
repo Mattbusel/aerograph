@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Aerograph - airspace intelligence, every track judged</title>
+<meta name="description" content="A live national map that does not just plot aircraft, it judges every track. Real crowd-sourced ADS-B and MLAT, with the integrity metadata (NIC, NACp, SIL), squawk and emergency state read on each dot: emergency, low-integrity, mesh-triangulated, rebroadcast or clean. Real data only, no simulation." />
+<meta property="og:title" content="Aerograph - airspace intelligence, every track judged" />
+<meta property="og:description" content="Most maps plot what broadcasts and trust it. Aerograph judges every track and flags what the data does not back up. Real aircraft, live, from thousands of volunteer ground receivers. No simulation." />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://aerograph.tensorust.com" />
+<meta property="og:image" content="https://aerograph.tensorust.com/grid-preview.png" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:image" content="https://aerograph.tensorust.com/grid-preview.png" />
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="/dossier.js" defer></script>
+<style>
+  :root {
+    --bg:#05070d; --fg:#e8eef7; --muted:#8a97ad; --line:#1a2334;
+    /* trust-class palette, keyed to live.js cls */
+    --ok:#28e0ff;        /* self-reported, integrity present */
+    --mlat:#ffcf4a;      /* mesh-triangulated, no GPS */
+    --tisb:#5b7290;      /* rebroadcast */
+    --unverified:#b45cff;/* low / zero position integrity */
+    --emergency:#ff3b5c; /* distress squawk / emergency flag */
+    --drone:#2bd47a;
+    --accent:#ffcf4a;
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--fg);
+    font-family:"Inter",system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  #map { position:absolute; inset:0; }
+  .panel { position:absolute; z-index:5; background:rgba(8,12,22,0.82);
+    border:1px solid var(--line); border-radius:12px; backdrop-filter:blur(8px); }
+  header.bar { top:14px; left:14px; right:14px; display:flex; align-items:center;
+    justify-content:space-between; gap:14px; padding:12px 16px; flex-wrap:wrap; }
+  .brand { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
+  .brand b { font-size:18px; letter-spacing:0.02em; }
+  .brand span { color:var(--muted); font-size:12.5px; }
+  .dot { width:8px; height:8px; border-radius:50%; background:#2ec27e; display:inline-block;
+    box-shadow:0 0 8px #2ec27e; animation:pulse 2s infinite; margin-right:5px; }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.35;} }
+  nav a { color:var(--fg); text-decoration:none; font-size:12.5px; margin-left:16px; opacity:.85; }
+  nav a:hover { opacity:1; color:var(--accent); }
+
+  /* stat row */
+  .stats { bottom:14px; left:14px; padding:12px 14px; display:flex; gap:22px; }
+  .stat .n { font-size:24px; font-weight:700; font-variant-numeric:tabular-nums; line-height:1;
+    transition:opacity .4s ease; }
+  .stat .l { font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin-top:5px; }
+  .stat.air .n{color:var(--fg);} .stat.mlat .n{color:var(--mlat);} .stat.drone .n{color:var(--drone);}
+  .stat.flagged .n{color:var(--muted);} .stat.flagged.hot .n{color:var(--emergency);}
+  .stat.flagged.hot .l{color:var(--emergency);}
+  .stats.stale .n { opacity:.42; }
+
+  /* alerts strip */
+  .alerts { top:74px; left:14px; width:272px; max-height:38vh; overflow-y:auto; padding:10px 12px; }
+  .alerts h4 { margin:0 0 7px; font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }
+  .alerts .empty { color:var(--muted); font-size:11.5px; line-height:1.5; }
+  .alert { display:flex; align-items:center; gap:9px; padding:6px 7px; border-radius:8px; cursor:pointer;
+    font-size:12px; margin:3px 0; border:1px solid transparent; }
+  .alert:hover { background:rgba(255,255,255,.04); border-color:var(--line); }
+  .alert .sw { width:9px; height:9px; border-radius:50%; flex:none; box-shadow:0 0 7px currentColor; }
+  .alert .cs { font-weight:600; font-variant-numeric:tabular-nums; }
+  .alert .why { color:var(--muted); font-size:11px; }
+  .alert.emergency .sw{ color:var(--emergency); background:var(--emergency); }
+  .alert.unverified .sw{ color:var(--unverified); background:var(--unverified); }
+  .alert.emergency .cs{ color:var(--emergency); }
+
+  /* legend */
+  .legend { bottom:14px; right:14px; padding:12px 14px; font-size:12px; max-width:300px; }
+  .legend .row { display:flex; align-items:flex-start; gap:8px; margin:5px 0; line-height:1.35; }
+  .legend .sw { width:10px; height:10px; border-radius:50%; flex:none; margin-top:3px; }
+  .legend .row small { color:var(--muted); display:block; font-size:10.5px; }
+  .legend .note { color:var(--muted); font-size:11px; line-height:1.5; margin-top:8px; border-top:1px solid var(--line); padding-top:8px; }
+  .legend a { color:var(--accent); text-decoration:none; }
+
+  /* popup / dossier */
+  .maplibregl-popup-content { background:#0a0e18; color:var(--fg); border:1px solid var(--line);
+    border-radius:10px; font-size:12.5px; padding:12px 14px; max-width:300px; }
+  .maplibregl-popup-tip { border-top-color:#0a0e18 !important; border-bottom-color:#0a0e18 !important; }
+  .pop b { color:#fff; font-size:13.5px; }
+  .pop .facts { color:var(--muted); margin-top:4px; }
+  .chip { display:inline-block; font-size:10px; letter-spacing:.05em; text-transform:uppercase;
+    padding:2px 7px; border-radius:5px; margin-top:7px; font-weight:600; }
+  .dossier-slot { margin-top:9px; border-top:1px solid var(--line); padding-top:8px; font-size:11.5px; color:var(--muted); }
+
+  .err { position:absolute; bottom:76px; left:14px; z-index:6; font-size:11px; color:var(--accent); display:none;
+    background:rgba(8,12,22,.85); border:1px solid var(--line); border-radius:8px; padding:5px 9px; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<header class="panel bar">
+  <div class="brand">
+    <b>Aerograph</b>
+    <span><span class="dot"></span>airspace intelligence. most maps plot what broadcasts and trust it; Aerograph judges every track. real data, no simulation.</span>
+  </div>
+  <nav>
+    <a href="https://github.com/Mattbusel/aerograph" target="_blank" rel="noopener">Source + $6 node</a>
+    <a href="https://tensorust.com" target="_blank" rel="noopener">Tensorust</a>
+  </nav>
+</header>
+
+<section class="panel alerts" id="alerts">
+  <h4>Flagged tracks</h4>
+  <div class="empty" id="alerts-empty">No flagged tracks right now.</div>
+  <div id="alerts-list"></div>
+</section>
+
+<div class="panel stats" id="stats">
+  <div class="stat air"><div class="n" id="c-air">&middot;&middot;&middot;</div><div class="l">Live aircraft</div></div>
+  <div class="stat flagged" id="stat-flagged"><div class="n" id="c-flagged">0</div><div class="l">Flagged</div></div>
+  <div class="stat mlat"><div class="n" id="c-mlat">&middot;&middot;&middot;</div><div class="l">Mesh-triangulated</div></div>
+  <div class="stat drone"><div class="n" id="c-drone">0</div><div class="l">Remote ID drones</div></div>
+</div>
+
+<div class="panel legend">
+  <div class="row"><span class="sw" style="background:var(--emergency)"></span><div>Emergency / distress<small>squawk 7500 / 7600 / 7700 or emergency flag</small></div></div>
+  <div class="row"><span class="sw" style="background:var(--unverified)"></span><div>Low or zero position integrity<small>NIC, NACp or SIL at 0: the shape a spoof takes</small></div></div>
+  <div class="row"><span class="sw" style="background:var(--mlat)"></span><div>Mesh-triangulated, no onboard GPS<small>position fixed by the receiver network (MLAT)</small></div></div>
+  <div class="row"><span class="sw" style="background:var(--tisb)"></span><div>Rebroadcast position<small>relayed by ground stations (TIS-B)</small></div></div>
+  <div class="row"><span class="sw" style="background:var(--ok)"></span><div>Self-reported, integrity present<small>ordinary ADS-B track</small></div></div>
+  <div class="note">Aircraft are real and live from <a href="https://adsb.lol" target="_blank" rel="noopener">adsb.lol</a>, a mesh of thousands of volunteer ground receivers. Remote ID is a local broadcast with no cloud feed, so the drone layer stays empty until a <a href="https://github.com/Mattbusel/aerograph" target="_blank" rel="noopener">$6 node</a> reports. Nothing here is simulated.</div>
+</div>
+<div class="err" id="err"></div>
+
+<script>
+// Trust-class metadata. Keys match the cls field live.js assigns to every track.
+const CLS = {
+  emergency:  { color:"#ff3b5c", label:"Emergency / distress squawk",            glow:12, core:5.0 },
+  unverified: { color:"#b45cff", label:"Low or zero position integrity (the shape a spoof takes)", glow:11, core:4.6 },
+  mlat:       { color:"#ffcf4a", label:"Mesh-triangulated, no onboard GPS (MLAT)", glow:7,  core:4.2 },
+  tisb:       { color:"#5b7290", label:"Rebroadcast position (TIS-B)",             glow:5,  core:3.4 },
+  ok:         { color:"#28e0ff", label:"Self-reported, integrity present (ADS-B)", glow:5,  core:4.0 },
+};
+const clsColor = (c) => (CLS[c] || CLS.ok).color;
+
+const map = new maplibregl.Map({
+  container: "map",
+  style: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
+  center: [-96, 38.5], zoom: 3.7, attributionControl: false,
+});
+map.addControl(new maplibregl.AttributionControl({ compact: true }), "top-right");
+map.addControl(new maplibregl.NavigationControl({ showCompass:false }), "bottom-right");
+
+const EMPTY = { type:"FeatureCollection", features:[] };
+let selected = null;
+let lastFeatures = [];          // last good FeatureCollection features; never cleared by an empty poll
+let lastSummary = null;         // last good counters
+
+// color + radius expressions driven by cls
+const colorExpr = ["match", ["get","cls"],
+  "emergency", CLS.emergency.color,
+  "unverified", CLS.unverified.color,
+  "mlat", CLS.mlat.color,
+  "tisb", CLS.tisb.color,
+  CLS.ok.color];
+const glowRadiusExpr = ["match", ["get","cls"],
+  "emergency", CLS.emergency.glow,
+  "unverified", CLS.unverified.glow,
+  "mlat", CLS.mlat.glow,
+  "tisb", CLS.tisb.glow,
+  CLS.ok.glow];
+
+map.on("load", () => {
+  map.addSource("aircraft", { type:"geojson", data:EMPTY });
+
+  // soft glow, larger for flagged so a flagged track is findable at national zoom
+  map.addLayer({ id:"ac-glow", type:"circle", source:"aircraft", paint:{
+    "circle-radius":glowRadiusExpr,
+    "circle-color":colorExpr,
+    "circle-opacity":["match",["get","cls"],"emergency",0.32,"unverified",0.26,0.16],
+    "circle-blur":0.9 } });
+
+  // core dot
+  map.addLayer({ id:"ac-pt", type:"circle", source:"aircraft", paint:{
+    "circle-radius":["interpolate",["linear"],["zoom"],
+      3, ["match",["get","cls"],"emergency",3.4,"unverified",3.0,2.2],
+      7, ["match",["get","cls"],"emergency",5.4,"unverified",5.0,4.2],
+      11,["match",["get","cls"],"emergency",7.5,"unverified",7.0,6.0]],
+    "circle-color":colorExpr,
+    "circle-stroke-color":["case",["get","sel"],"#ffffff","#0a0e18"],
+    "circle-stroke-width":["case",["get","sel"],2,0.8] } });
+
+  // emergency pulsing ring, drawn on top
+  map.addLayer({ id:"ac-emergency", type:"circle", source:"aircraft",
+    filter:["==",["get","cls"],"emergency"], paint:{
+      "circle-radius":14, "circle-color":"rgba(0,0,0,0)",
+      "circle-stroke-color":CLS.emergency.color, "circle-stroke-width":2, "circle-stroke-opacity":0.9 } });
+
+  // animate the emergency ring (radius + opacity breathe)
+  (function pulseRing(){
+    if (map.getLayer("ac-emergency")) {
+      const t = (performance.now() % 1600) / 1600;      // 0..1
+      const r = 10 + 10 * Math.sin(t * Math.PI);        // 10..20
+      const o = 0.9 - 0.65 * Math.sin(t * Math.PI);     // 0.9..0.25
+      map.setPaintProperty("ac-emergency", "circle-radius", r);
+      map.setPaintProperty("ac-emergency", "circle-stroke-opacity", o);
+    }
+    requestAnimationFrame(pulseRing);
+  })();
+
+  map.on("click","ac-pt", onAircraftClick);
+  map.on("mouseenter","ac-pt",()=>map.getCanvas().style.cursor="pointer");
+  map.on("mouseleave","ac-pt",()=>map.getCanvas().style.cursor="");
+
+  tick();
+  setInterval(tick, 8000);
+  map.on("moveend", () => { clearTimeout(window.__mt); window.__mt=setTimeout(tick,400); });
+});
+
+function onAircraftClick(e){
+  const p = e.features[0].properties;
+  selected = p.hex;
+  const cls = p.cls || "ok";
+  const meta = CLS[cls] || CLS.ok;
+  const alt = p.alt_baro==null||p.alt_baro==="ground"||p.alt_baro==="" ? "ground" : Math.round(p.alt_baro).toLocaleString()+" ft";
+  const spd = p.gs==null||p.gs==="" ? "unknown" : Math.round(p.gs)+" kt";
+  const title = (p.flight && p.flight.trim()) || p.hex || "unknown";
+
+  // Build popup content as a DOM node with a dossier slot the attribution agent fills.
+  const node = document.createElement("div");
+  node.className = "pop";
+  node.innerHTML =
+    `<b>${title}</b>` +
+    `<div class="facts">alt ${alt} &middot; speed ${spd}${p.type?` &middot; ${p.type}`:""}` +
+    `${p.hex?` &middot; ${p.hex}`:""}</div>` +
+    `<span class="chip" style="background:${hexToRgba(meta.color,0.16)};color:${meta.color}">${meta.label}</span>` +
+    `<div class="dossier-slot">Resolving owner...</div>`;
+
+  const popup = new maplibregl.Popup({ closeButton:false, offset:12, maxWidth:"300px" })
+    .setLngLat(e.lngLat).setDOMContent(node).addTo(map);
+  refreshSel();
+
+  // Clean seam for the dossier / attribution agent. It owns window.showDossier and
+  // fills the .dossier-slot with the real owner / parent / lobbying record.
+  // Payload carries hex (the feed has hex, not the N-number) plus the slot to write into.
+  if (typeof window.showDossier === "function") {
+    try {
+      window.showDossier({
+        hex: p.hex, tail: null, flight: (p.flight||"").trim(),
+        type: p.type || "", cls: cls, clsLabel: meta.label, clsColor: meta.color,
+        slot: node.querySelector(".dossier-slot"), popup: popup, lngLat: e.lngLat,
+      });
+    } catch (err) { /* attribution is additive; a failure never breaks the trust layer */ }
+  } else {
+    node.querySelector(".dossier-slot").textContent = "";
+  }
+}
+
+function hexToRgba(hex, a){
+  const h = hex.replace("#",""); const n = parseInt(h,16);
+  return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;
+}
+
+function refreshSel(){
+  const fc = { type:"FeatureCollection", features:lastFeatures.map(f=>({ ...f,
+    properties:{ ...f.properties, sel: f.properties.hex===selected } })) };
+  if (map.getSource("aircraft")) map.getSource("aircraft").setData(fc);
+}
+
+function viewportQuery(){
+  const z = map.getZoom();
+  if (z < 5.2) return "national=1";
+  const c = map.getCenter();
+  const b = map.getBounds();
+  // half-diagonal in nautical miles
+  const R=3440.065, toR=Math.PI/180;
+  const dLat=(b.getNorth()-b.getSouth())*toR, dLon=(b.getEast()-b.getWest())*toR;
+  const a=Math.sin(dLat/2)**2 + Math.cos(b.getSouth()*toR)*Math.cos(b.getNorth()*toR)*Math.sin(dLon/2)**2;
+  let nm = R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))/2;
+  nm = Math.min(250, Math.max(20, Math.round(nm)));
+  return `lat=${c.lat.toFixed(3)}&lon=${c.lng.toFixed(3)}&radius=${nm}`;
+}
+
+function setStale(on){
+  document.getElementById("stats").classList.toggle("stale", on);
+}
+
+async function tick(){
+  try {
+    const r = await fetch(`/api/live?${viewportQuery()}`, { cache:"no-store" });
+    if (!r.ok) throw new Error("feed "+r.status);
+    const d = await r.json();
+    const ac = d.aircraft || [];
+
+    // RESILIENCE: an empty frame never overwrites good data. live.js already
+    // caches only non-empty responses; the client mirrors that here.
+    if (ac.length === 0) {
+      showHiccup("live feed returned no aircraft, holding last good frame");
+      setStale(true);
+      return;
+    }
+
+    lastFeatures = ac.map(a=>({ type:"Feature",
+      geometry:{ type:"Point", coordinates:[a.lon, a.lat] },
+      properties:{ hex:a.hex, flight:a.flight, alt_baro:a.alt_baro, gs:a.gs,
+        type:a.type||"", cls:a.cls||"ok", squawk:a.squawk, sel:a.hex===selected } }));
+    lastSummary = {
+      total: d.total!=null ? d.total : ac.length,
+      mlat: d.mlat||0,
+      flagged: d.flagged||0,
+      emergency: d.emergency||0,
+      unverified: d.unverified||0,
+    };
+    refreshSel();
+    renderCounters(lastSummary);
+    renderAlerts(lastFeatures);
+    setStale(false);
+    clearHiccup();
+  } catch(e){
+    // Keep the last good dots and counters; only dim them.
+    showHiccup("live feed hiccup: "+e.message+" (retrying)");
+    setStale(true);
+  }
+}
+
+function renderCounters(s){
+  document.getElementById("c-air").textContent = (s.total||0).toLocaleString();
+  document.getElementById("c-mlat").textContent = (s.mlat||0).toLocaleString();
+  const fEl = document.getElementById("c-flagged");
+  const stat = document.getElementById("stat-flagged");
+  fEl.textContent = (s.flagged||0).toLocaleString();
+  stat.classList.toggle("hot", (s.flagged||0) > 0);
+  // Remote ID drones stays 0 / awaiting nodes until a real node reports. Never simulated.
+}
+
+function renderAlerts(features){
+  const flagged = features.filter(f => f.properties.cls==="emergency" || f.properties.cls==="unverified");
+  const list = document.getElementById("alerts-list");
+  const empty = document.getElementById("alerts-empty");
+  if (flagged.length === 0) {
+    empty.style.display = "block";
+    list.innerHTML = "";
+    return;
+  }
+  empty.style.display = "none";
+  // emergency first, then unverified
+  flagged.sort((a,b)=> (a.properties.cls==="emergency"?0:1) - (b.properties.cls==="emergency"?0:1));
+  list.innerHTML = flagged.map(f=>{
+    const p = f.properties;
+    const cs = (p.flight && p.flight.trim()) || p.hex || "unknown";
+    const why = p.cls==="emergency"
+      ? (p.squawk && ["7500","7600","7700"].includes(String(p.squawk)) ? "squawk "+p.squawk : "emergency")
+      : "zero position integrity";
+    const [lon,lat] = f.geometry.coordinates;
+    return `<div class="alert ${p.cls}" data-lon="${lon}" data-lat="${lat}" data-hex="${p.hex}">`+
+      `<span class="sw"></span><span class="cs">${cs}</span><span class="why">${why}</span></div>`;
+  }).join("");
+  list.querySelectorAll(".alert").forEach(el=>{
+    el.addEventListener("click", ()=>{
+      const lon = parseFloat(el.dataset.lon), lat = parseFloat(el.dataset.lat);
+      selected = el.dataset.hex;
+      refreshSel();
+      map.flyTo({ center:[lon,lat], zoom:Math.max(map.getZoom(),7.5), speed:0.9 });
+    });
+  });
+}
+
+function showHiccup(msg){
+  const el=document.getElementById("err"); el.textContent=msg; el.style.display="block";
+}
+function clearHiccup(){
+  document.getElementById("err").style.display="none";
+}
+</script>
+</body>
+</html>
