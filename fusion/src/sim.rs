@@ -10,7 +10,7 @@
 //! runs over this is the real crate code; only the input is simulated, and the
 //! page must label it as such.
 
-use remoteid::{Message, Transmitter};
+use remoteid::{Message, OperatorLocationType, Transmitter};
 use remoteid_scenario::{generate, EmittedFrame, Scenario, ScenarioKind};
 
 use crate::report::{
@@ -128,7 +128,26 @@ impl GridSim {
 
         // Benign drones: honest, each on its own moving track.
         let benign = Scenario::new(ScenarioKind::Clean, cfg.benign.max(1));
-        for f in generate(&benign) {
+        for mut f in generate(&benign) {
+            // A drone in flight broadcasts the operator's live GNSS fix. The
+            // scenario leaves the System type at its default (Takeoff), so the
+            // operator position reads only as a launch point and the live pilot
+            // never surfaces. Mark the flight's operator location LiveGnss so
+            // the grid locates the pilot, and emit a second System frame at the
+            // same point tagged Takeoff so the launch dossier still populates.
+            if let Message::System(_) = &f.message {
+                let mut takeoff = f.clone();
+                if let Message::System(ts) = &mut takeoff.message {
+                    ts.operator_location_type = OperatorLocationType::Takeoff;
+                }
+                frames.push(SimFrame {
+                    frame: takeoff,
+                    source: Source::Drone,
+                });
+                if let Message::System(sys) = &mut f.message {
+                    sys.operator_location_type = OperatorLocationType::LiveGnss;
+                }
+            }
             frames.push(SimFrame {
                 frame: f,
                 source: Source::Drone,
