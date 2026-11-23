@@ -10,6 +10,35 @@ and drops a pin on the operator.
 
 > Tagline: *Every drone, decoded. Not dots, dossiers.*
 
+## Live map
+
+**[Open the live map -> mattbusel.github.io/aerograph](https://mattbusel.github.io/aerograph/)**
+
+The map runs the real decode and fusion in your browser (compiled to WebAssembly)
+over a labelled live simulation of a city sensor mesh. Click any drone for its
+full dossier. Watch a spoof flood of hundreds of fake broadcasts collapse to a
+single pin on the operator radio. The crates doing the work are the same ones a
+real sensor runs; only the city traffic is simulated, and the map says so.
+
+## Join the grid with a $6 board
+
+The network grows itself because the sensor is cheap and open. One ESP32 board
+(about $6) running [`remoteid-esp32`](https://github.com/Mattbusel/remoteid-esp32)
+listens for Remote ID broadcasts, decodes them, and POSTs `DetectionReport` JSON
+to an aggregator. Point enough boards at one aggregator across a city and the
+fusion triangulates spoofers for real, no simulation.
+
+```sh
+# 1. flash a $6 ESP32 with the node firmware (remoteid-esp32)
+# 2. run an aggregator anywhere:
+cargo run -p aerograph-aggregator --release -- --bind 0.0.0.0:8787
+# 3. point your board (or the PC shim) at it:
+cargo run -p aerograph-node -- sim --post http://YOUR_AGGREGATOR:8787
+```
+
+Every added node sharpens triangulation and widens coverage. That is the whole
+idea: a public, open map of the sky that anyone can plug into.
+
 The grid is a mesh of $6 open-source sensor nodes (`remoteid-esp32`). Nodes POST
 decoded Remote ID sightings to an aggregator; the aggregator fuses them into one
 live entity per drone and triangulates spoof floods to the operating radio.
