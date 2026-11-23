@@ -171,10 +171,13 @@ function render(state) {
   const nodes = state.nodes || [];
   const tri = state.triangulation || [];
 
-  // pick the one genuine track: highest real_score among non-spoofed
+  // pick the one genuine track: highest real_score of all. real_score is the
+  // sentinel's likelihood-a-track-is-real; the flood puppeteer scores ~0, real
+  // aircraft score high, so this is stable even when a flood tick makes the
+  // per-tick verdict read "suspicious" on a real drone.
   let realTx = null, realBest = -1;
   for (const e of entities) {
-    if (e.verdict !== "spoofed" && (e.real_score ?? 0) > realBest) { realBest = e.real_score ?? 0; realTx = e.transmitter; }
+    if ((e.real_score ?? 0) > realBest) { realBest = e.real_score ?? 0; realTx = e.transmitter; }
   }
 
   const droneF = [], trailF = [], coneF = [], watchLnF = [], aimF = [], realRingF = [];
@@ -228,7 +231,10 @@ function render(state) {
   const floodActive = flood.level && flood.level !== "clear" && flood.level !== "none";
   for (const t of tri) fakeSeen.add(t.transmitter);
   const fakesNeutralized = floodActive ? CONFIG.fakes_per_radio * Math.max(tri.length, 1) : CONFIG.fakes_per_radio * fakeSeen.size;
-  setCounter("c-drones", entities.filter((e) => e.verdict !== "spoofed").length);
+  // count real aircraft by the sentinel's own likelihood-real score, not the
+  // per-tick verdict: during a heavy flood a real drone's verdict can read
+  // "suspicious", but its real_score stays well above the puppeteer's ~0.
+  setCounter("c-drones", entities.filter((e) => (e.real_score ?? 0) >= 0.25).length);
   setCounter("c-pilots", pilots);
   setCounter("c-fakes", fakesNeutralized);
   setCounter("c-nodes", nodes.length);
