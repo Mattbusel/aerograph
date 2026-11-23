@@ -199,6 +199,22 @@
         '</div>';
     }
 
+    // Reveal the hidden network (the "past-possible" connection graph). Only shown
+    // when this owner actually resolves to a node in the real ontology graph; the
+    // click opens the walkable graph focused on that entity. Never a dead button.
+    var hasGraph = false;
+    try { hasGraph = !!(window.aerographGraph && window.aerographGraph.nodeIdForDossier(d)); } catch (e) {}
+    if (hasGraph) {
+      html += '<button class="dz-reveal" id="dz-reveal-btn" type="button">' +
+        '<span class="rv-i" aria-hidden="true">' +
+          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff6ea9" stroke-width="1.8">' +
+          '<circle cx="5" cy="6" r="2"/><circle cx="19" cy="7" r="2"/><circle cx="12" cy="18" r="2"/>' +
+          '<path d="M6.6 7.1 10.6 16M17.4 8.3 13.4 16.5M7 6.5 17 7"/></svg></span>' +
+        '<span class="rv-t"><b>Reveal the hidden network</b>' +
+          '<span>shared lenders, lobbyists, siblings, federal money &mdash; every edge sourced</span></span>' +
+        '</button>';
+    }
+
     // Footer: the framing + sources + resolved date. Calm, sourced, no theatrics.
     var when = d.resolved_at ? new Date(d.resolved_at) : null;
     var whenStr = when && !isNaN(when) ? when.toISOString().slice(0, 10) : "";
@@ -210,6 +226,11 @@
       '</div>';
 
     body.innerHTML = html;
+
+    var rb = body.querySelector("#dz-reveal-btn");
+    if (rb) rb.addEventListener("click", function () {
+      if (typeof window.showNetworkForDossier === "function") window.showNetworkForDossier(d);
+    });
   }
 
   function renderUnresolved(d) {

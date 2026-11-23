@@ -110,6 +110,13 @@ function normalizeRecord(hex, tail, raw) {
   const lobbying = cleanLobbying(props);
   if (lobbying && !lobbying.firm_names && firmNames.length) lobbying.firm_names = firmNames;
 
+  // PAC: the owner's own federal committee, if the ontology links one. Real FEC
+  // record (committee id), never inferred. Matches the Walmart "PAC C00093054" shape.
+  const pacPrev = firstPreview(links.HAS_PAC);
+  const pac = pacPrev
+    ? { name: pacPrev.name, id: (pacPrev.oid && pacPrev.oid.startsWith("pac:")) ? pacPrev.oid.slice(4) : null }
+    : null;
+
   // sources: only what the ontology actually cited for this owner
   const sources = Array.isArray(org.sources) ? org.sources : (air.owner ? ["faa"] : []);
 
@@ -125,6 +132,7 @@ function normalizeRecord(hex, tail, raw) {
     parent,
     awards,
     lobbying,
+    pac,
     sources,
     resolved_at: raw.resolved_at || new Date().toISOString(),
     note: "Ownership and control from public records. Not a claim about this flight.",

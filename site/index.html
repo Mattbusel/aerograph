@@ -15,6 +15,7 @@
 <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="/dossier.js" defer></script>
+<script src="/graph.js" defer></script>
 <style>
   :root {
     --bg:#05070d; --fg:#e8eef7; --muted:#8a97ad; --line:#1a2334;
@@ -88,6 +89,98 @@
 
   .err { position:absolute; bottom:76px; left:14px; z-index:6; font-size:11px; color:var(--accent); display:none;
     background:rgba(8,12,22,.85); border:1px solid var(--line); border-radius:8px; padding:5px 9px; }
+
+  /* sky convergence flex: same owner, 2+ jets, one place, right now */
+  .converge { top:74px; right:14px; width:304px; max-width:84vw; max-height:46vh; overflow-y:auto; padding:12px 14px; }
+  .converge h4 { margin:0 0 3px; font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:#ff7a45; }
+  .converge .sub { color:var(--muted); font-size:10.5px; line-height:1.5; margin:0 0 9px; }
+  .converge .empty { color:var(--muted); font-size:11.5px; line-height:1.55; }
+  .converge .empty b { color:#c9d4e4; font-weight:600; }
+  .cgroup { border:1px solid rgba(255,122,69,.38); background:rgba(255,122,69,.07); border-radius:9px;
+    padding:9px 10px; margin:7px 0; cursor:pointer; transition:background .15s, border-color .15s; }
+  .cgroup:hover { background:rgba(255,122,69,.13); border-color:rgba(255,122,69,.6); }
+  .cgroup .owner { font-size:13px; font-weight:700; color:#fff; letter-spacing:.01em; }
+  .cgroup .conv { font-size:11.5px; color:#ffb089; margin-top:2px; font-weight:600; }
+  .cgroup .tails { font-size:10.5px; color:var(--muted); margin-top:4px; font-variant-numeric:tabular-nums;
+    line-height:1.5; word-break:break-word; }
+  .cgroup .overlay { font-size:11px; color:#cdd7e6; margin-top:6px; line-height:1.5; }
+  .cgroup .overlay .amt { color:var(--accent); font-weight:600; }
+  .cgroup .vis { font-size:10px; color:#7c8aa0; margin-top:6px; letter-spacing:.03em; text-transform:uppercase; }
+
+  /* ground drawer: who-owns-your-street, slides in from the right, dark-matched */
+  .ground-scrim { position:absolute; inset:0; z-index:9; background:rgba(2,4,9,.46);
+    backdrop-filter:blur(1.5px); opacity:0; pointer-events:none; transition:opacity .22s ease; }
+  .ground-scrim.on { opacity:1; pointer-events:auto; }
+  .ground { position:absolute; z-index:10; top:0; right:0; height:100%; width:400px; max-width:92vw;
+    background:rgba(7,10,18,0.94); border-left:1px solid var(--line); backdrop-filter:blur(10px);
+    transform:translateX(104%); transition:transform .26s cubic-bezier(.4,.9,.3,1);
+    display:flex; flex-direction:column; }
+  .ground.on { transform:translateX(0); }
+  .ground .ghead { padding:16px 18px 12px; border-bottom:1px solid var(--line); flex:none; }
+  .ground .ghead .gtop { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .ground .ghead b { font-size:15px; letter-spacing:.01em; }
+  .ground .ghead .gtag { color:#ff6a3d; font-size:10px; letter-spacing:.1em; text-transform:uppercase; font-weight:700; }
+  .ground .gclose { background:none; border:none; color:var(--muted); font-size:20px; line-height:1;
+    cursor:pointer; padding:2px 4px; }
+  .ground .gclose:hover { color:var(--fg); }
+  .ground .gsub { color:var(--muted); font-size:11.5px; line-height:1.55; margin-top:8px; }
+  .ground .gbody { overflow-y:auto; padding:14px 18px 20px; flex:1; }
+
+  /* search box */
+  .gsearch { display:flex; gap:7px; margin-bottom:6px; }
+  .gsearch input { background:#0a0e18; border:1px solid var(--line); border-radius:8px; color:var(--fg);
+    font-size:12.5px; padding:9px 11px; font-family:inherit; min-width:0; }
+  .gsearch input#g-addr { flex:1; }
+  .gsearch input#g-zip { width:66px; flex:none; }
+  .gsearch input:focus { outline:none; border-color:#ff6a3d; }
+  .gsearch button { background:#ff6a3d; border:none; color:#120503; font-weight:700; font-size:12px;
+    border-radius:8px; padding:0 13px; cursor:pointer; flex:none; letter-spacing:.02em; }
+  .gsearch button:hover { background:#ff835f; }
+  .ghint { color:var(--muted); font-size:10.5px; line-height:1.5; margin:0 0 14px; }
+  .ghint a { color:#ff6a3d; text-decoration:none; cursor:pointer; }
+
+  /* result card */
+  .gcard { border:1px solid var(--line); border-radius:11px; padding:13px 14px; margin-bottom:16px;
+    background:rgba(255,106,61,0.05); }
+  .gcard.miss { background:rgba(138,151,173,0.05); }
+  .gcard .owner { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.07em; }
+  .gcard .ctrl { font-size:15px; font-weight:700; color:#fff; margin:3px 0 2px; line-height:1.25; }
+  .gcard .addr { font-size:11.5px; color:var(--muted); margin-bottom:9px; }
+  .gcard .nums { display:flex; gap:18px; margin:9px 0; }
+  .gcard .nums .n { font-size:19px; font-weight:700; font-variant-numeric:tabular-nums; color:#ff8a63; line-height:1; }
+  .gcard .nums .l { font-size:9.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin-top:4px; }
+  .gflag { display:inline-block; font-size:10px; letter-spacing:.05em; text-transform:uppercase; font-weight:700;
+    padding:3px 8px; border-radius:5px; background:rgba(255,59,92,.16); color:#ff6a7f; margin:2px 0 6px; }
+  .gcard .foot { font-size:10.5px; color:var(--muted); line-height:1.55; border-top:1px solid var(--line);
+    padding-top:8px; margin-top:9px; }
+
+  /* group roster */
+  .gsec-label { font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted);
+    margin:18px 0 9px; display:flex; align-items:center; justify-content:space-between; }
+  .grow { border:1px solid var(--line); border-radius:9px; padding:10px 12px; margin:7px 0; cursor:pointer;
+    transition:border-color .15s, background .15s; }
+  .grow:hover { border-color:#ff6a3d; background:rgba(255,106,61,0.04); }
+  .grow .gr-top { display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
+  .grow .gr-name { font-weight:600; font-size:13px; color:var(--fg); }
+  .grow .gr-homes { font-size:14px; font-weight:700; color:#ff8a63; font-variant-numeric:tabular-nums; flex:none; }
+  .grow .gr-meta { font-size:10.5px; color:var(--muted); margin-top:3px; }
+  .grow .gr-detail { display:none; margin-top:10px; border-top:1px solid var(--line); padding-top:9px; }
+  .grow.open .gr-detail { display:block; }
+  .grow .gr-detail .dl { font-size:10px; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); margin:8px 0 4px; }
+  .grow .gr-detail .ent { font-size:11px; color:var(--fg); line-height:1.6; }
+  .grow .gr-detail .ent span { color:var(--muted); }
+  .grow .gr-detail .samp { font-size:11px; color:var(--fg); line-height:1.5; margin:4px 0; }
+  .grow .gr-detail .samp .o { color:var(--muted); display:block; font-size:10px; }
+  .grow .gr-note { font-size:10.5px; color:var(--muted); line-height:1.5; margin-top:8px; font-style:italic; }
+
+  /* counties */
+  .gcounty { display:flex; flex-wrap:wrap; gap:6px; margin:4px 0 2px; }
+  .gcounty .c { font-size:10.5px; color:var(--muted); background:rgba(255,255,255,.04);
+    border:1px solid var(--line); border-radius:6px; padding:3px 8px; }
+  .gfoot-note { color:var(--muted); font-size:10.5px; line-height:1.6; margin-top:14px;
+    border-top:1px solid var(--line); padding-top:11px; }
+  .gfoot-note a { color:#ff6a3d; text-decoration:none; }
+  .gloading { color:var(--muted); font-size:12px; padding:20px 0; text-align:center; }
 </style>
 </head>
 <body>
@@ -99,6 +192,7 @@
     <span><span class="dot"></span>airspace intelligence. most maps plot what broadcasts and trust it; Aerograph judges every track. real data, no simulation.</span>
   </div>
   <nav>
+    <a href="#" id="ground-open" role="button">Who owns your street</a>
     <a href="https://github.com/Mattbusel/aerograph" target="_blank" rel="noopener">Source + $6 node</a>
     <a href="https://tensorust.com" target="_blank" rel="noopener">Tensorust</a>
   </nav>
@@ -108,6 +202,13 @@
   <h4>Flagged tracks</h4>
   <div class="empty" id="alerts-empty">No flagged tracks right now.</div>
   <div id="alerts-list"></div>
+</section>
+
+<section class="panel converge" id="converge">
+  <h4>Sky convergence</h4>
+  <p class="sub">Same owner, two or more jets, one place, right now. Airlines, charter / fractional, EMS and trust-held tails are suppressed as routine noise. What is visible, not a forecast.</p>
+  <div class="empty" id="converge-empty">Watching live tracks against the corporate ownership set. No control group has 2+ of its aircraft co-located right now.</div>
+  <div id="converge-list"></div>
 </section>
 
 <div class="panel stats" id="stats">
@@ -125,6 +226,29 @@
   <div class="row"><span class="sw" style="background:var(--ok)"></span><div>Self-reported, integrity present<small>ordinary ADS-B track</small></div></div>
   <div class="note">Aircraft are real and live from <a href="https://adsb.lol" target="_blank" rel="noopener">adsb.lol</a>, a mesh of thousands of volunteer ground receivers. Remote ID is a local broadcast with no cloud feed, so the drone layer stays empty until a <a href="https://github.com/Mattbusel/aerograph" target="_blank" rel="noopener">$6 node</a> reports. Nothing here is simulated.</div>
 </div>
+<div class="ground-scrim" id="ground-scrim"></div>
+<aside class="ground" id="ground" aria-hidden="true">
+  <div class="ghead">
+    <div class="gtop">
+      <div>
+        <span class="gtag">Ground layer</span>
+        <div><b>Who owns your street</b></div>
+      </div>
+      <button class="gclose" id="ground-close" aria-label="Close">&times;</button>
+    </div>
+    <div class="gsub">Type a US address and see who is really behind the deed: the shell LLC on the roll, the institution it resolves to, and how many homes that institution holds. Real county records only, nothing simulated.</div>
+  </div>
+  <div class="gbody" id="ground-body">
+    <div class="gsearch">
+      <input id="g-addr" type="text" placeholder="13014 N 62ND DR" autocomplete="off" spellcheck="false" />
+      <input id="g-zip" type="text" placeholder="ZIP" inputmode="numeric" autocomplete="off" />
+      <button id="g-go">Search</button>
+    </div>
+    <p class="ghint">Indexed institution-owned homes, 17 large counties. Try <a data-ex="13014 N 62ND DR|85304">13014 N 62ND DR, 85304</a> (Gilbert/Phoenix AZ).</p>
+    <div id="g-result"></div>
+    <div id="g-roster"><div class="gloading">Loading landlord roster...</div></div>
+  </div>
+</aside>
 <div class="err" id="err"></div>
 
 <script>
@@ -138,6 +262,43 @@ const CLS = {
 };
 const clsColor = (c) => (CLS[c] || CLS.ok).color;
 
+// Sky-convergence overlay color (distinct from every trust class).
+const CONVERGE_COLOR = "#ff7a45";
+// Co-location radius: 2+ same-owner jets within this many nautical miles of each
+// other count as converged (one metro / airport cluster). Real geometry.
+const CONVERGE_NM = 60;
+// Major US metros for a human place label. Real coordinates [lon,lat]; a cluster
+// with no metro within ~90nm is labeled honestly by its position.
+const METROS = [
+  ["New York",-74.00,40.71],["Los Angeles",-118.24,34.05],["Chicago",-87.63,41.88],
+  ["Dallas-Fort Worth",-97.04,32.90],["Atlanta",-84.39,33.75],["Miami",-80.19,25.76],
+  ["Seattle",-122.33,47.61],["Denver",-104.99,39.74],["Houston",-95.37,29.76],
+  ["Washington DC",-77.04,38.90],["Minneapolis",-93.27,44.98],["Las Vegas",-115.14,36.17],
+  ["San Francisco Bay",-122.20,37.60],["Phoenix",-112.07,33.45],["Boston",-71.06,42.36],
+  ["Detroit",-83.05,42.33],["Philadelphia",-75.16,39.95],["San Diego",-117.16,32.72],
+  ["Charlotte",-80.84,35.23],["Orlando",-81.38,28.54],["Nashville",-86.78,36.16],
+  ["Kansas City",-94.58,39.10],["St. Louis",-90.20,38.63],["Salt Lake City",-111.89,40.76],
+  ["Portland",-122.68,45.52],["Tampa",-82.46,27.95],["Austin",-97.74,30.27],
+  ["San Antonio",-98.49,29.42],["Bentonville/NW Arkansas",-94.27,36.33],["Cincinnati",-84.51,39.10],
+  ["Indianapolis",-86.16,39.77],["Columbus",-82.99,39.96],["Pittsburgh",-79.99,40.44],
+  ["Memphis",-90.05,35.15],["Raleigh-Durham",-78.79,35.87],["Teterboro/NY metro",-74.06,40.85],
+];
+function nmBetween(lon1,lat1,lon2,lat2){
+  const R=3440.065, toR=Math.PI/180;
+  const dLat=(lat2-lat1)*toR, dLon=(lon2-lon1)*toR;
+  const a=Math.sin(dLat/2)**2 + Math.cos(lat1*toR)*Math.cos(lat2*toR)*Math.sin(dLon/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+function placeLabel(lon,lat){
+  let best=null, bestNm=Infinity;
+  for (const [name,mlon,mlat] of METROS){
+    const d = nmBetween(lon,lat,mlon,mlat);
+    if (d<bestNm){ bestNm=d; best=name; }
+  }
+  if (best && bestNm<=90) return "near "+best;
+  return `near ${lat.toFixed(2)}, ${lon.toFixed(2)}`;
+}
+
 const map = new maplibregl.Map({
   container: "map",
   style: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
@@ -145,11 +306,28 @@ const map = new maplibregl.Map({
 });
 map.addControl(new maplibregl.AttributionControl({ compact: true }), "top-right");
 map.addControl(new maplibregl.NavigationControl({ showCompass:false }), "bottom-right");
+window.map = map; // debug/verify hook: inspect the live aircraft source
 
 const EMPTY = { type:"FeatureCollection", features:[] };
 let selected = null;
-let lastFeatures = [];          // last good FeatureCollection features; never cleared by an empty poll
-let lastSummary = null;         // last good counters
+let nationalFeatures = [];       // baseline: the whole-US set, always kept
+let localFeatures = [];          // optional extra local detail when zoomed in
+let lastSummary = null;          // last good counters
+let nationalAt = 0;              // last time the national baseline was refreshed
+
+function toFeatures(ac){
+  return ac.map(a=>({ type:"Feature",
+    geometry:{ type:"Point", coordinates:[a.lon, a.lat] },
+    properties:{ hex:a.hex, flight:a.flight, alt_baro:a.alt_baro, gs:a.gs,
+      type:a.type||"", cls:a.cls||"ok", squawk:a.squawk } }));
+}
+// Merge national baseline with any local detail, deduped by hex, local wins.
+function mergedFeatures(){
+  const byHex = new Map();
+  for (const f of nationalFeatures) byHex.set(f.properties.hex, f);
+  for (const f of localFeatures) byHex.set(f.properties.hex, f);
+  return [...byHex.values()];
+}
 
 // color + radius expressions driven by cls
 const colorExpr = ["match", ["get","cls"],
@@ -191,6 +369,17 @@ map.on("load", () => {
       "circle-radius":14, "circle-color":"rgba(0,0,0,0)",
       "circle-stroke-color":CLS.emergency.color, "circle-stroke-width":2, "circle-stroke-opacity":0.9 } });
 
+  // CONVERGENCE OVERLAY. Links between co-located same-owner jets (drawn beneath
+  // the dots) and a highlight ring around each converging dot (drawn on top).
+  map.addSource("converge-links", { type:"geojson", data:EMPTY });
+  map.addSource("converge-halo",  { type:"geojson", data:EMPTY });
+  map.addLayer({ id:"converge-links", type:"line", source:"converge-links", paint:{
+    "line-color":CONVERGE_COLOR, "line-width":1.6, "line-opacity":0.75, "line-dasharray":[2,1.4] } }, "ac-glow");
+  map.addLayer({ id:"converge-halo", type:"circle", source:"converge-halo", paint:{
+    "circle-radius":["interpolate",["linear"],["zoom"], 3,8, 7,13, 11,18],
+    "circle-color":"rgba(0,0,0,0)",
+    "circle-stroke-color":CONVERGE_COLOR, "circle-stroke-width":2, "circle-stroke-opacity":0.9 } });
+
   // animate the emergency ring (radius + opacity breathe)
   (function pulseRing(){
     if (map.getLayer("ac-emergency")) {
@@ -207,8 +396,10 @@ map.on("load", () => {
   map.on("mouseenter","ac-pt",()=>map.getCanvas().style.cursor="pointer");
   map.on("mouseleave","ac-pt",()=>map.getCanvas().style.cursor="");
 
+  loadConvergeGroups();
   tick();
   setInterval(tick, 8000);
+  setInterval(loadConvergeGroups, 3600000); // ownership is static; refresh hourly
   map.on("moveend", () => { clearTimeout(window.__mt); window.__mt=setTimeout(tick,400); });
 });
 
@@ -257,7 +448,7 @@ function hexToRgba(hex, a){
 }
 
 function refreshSel(){
-  const fc = { type:"FeatureCollection", features:lastFeatures.map(f=>({ ...f,
+  const fc = { type:"FeatureCollection", features:mergedFeatures().map(f=>({ ...f,
     properties:{ ...f.properties, sel: f.properties.hex===selected } })) };
   if (map.getSource("aircraft")) map.getSource("aircraft").setData(fc);
 }
@@ -280,40 +471,58 @@ function setStale(on){
   document.getElementById("stats").classList.toggle("stale", on);
 }
 
+async function fetchLive(q){
+  const r = await fetch(`/api/live?${q}`, { cache:"no-store" });
+  if (!r.ok) throw new Error("feed "+r.status);
+  return r.json();
+}
+
+// The national baseline is ALWAYS kept and rendered, so zooming can never empty
+// the map: a local query only ADDS detail, it never replaces the baseline, and
+// an empty local result just falls back to the baseline (which already covers
+// every major metro). Dots can only disappear if they genuinely leave the view.
 async function tick(){
-  try {
-    const r = await fetch(`/api/live?${viewportQuery()}`, { cache:"no-store" });
-    if (!r.ok) throw new Error("feed "+r.status);
-    const d = await r.json();
-    const ac = d.aircraft || [];
+  const now = Date.now();
+  const zoomedIn = map.getZoom() >= 5.2;
 
-    // RESILIENCE: an empty frame never overwrites good data. live.js already
-    // caches only non-empty responses; the client mirrors that here.
-    if (ac.length === 0) {
-      showHiccup("live feed returned no aircraft, holding last good frame");
-      setStale(true);
-      return;
-    }
+  // 1) National baseline: refresh at most every ~15s; never cleared on empty.
+  if (now - nationalAt > 15000 || nationalFeatures.length === 0) {
+    try {
+      const d = await fetchLive("national=1");
+      const ac = d.aircraft || [];
+      if (ac.length) {
+        nationalFeatures = toFeatures(ac);
+        nationalAt = now;
+        lastSummary = { total: d.total!=null?d.total:ac.length, mlat:d.mlat||0,
+          flagged:d.flagged||0, emergency:d.emergency||0, unverified:d.unverified||0 };
+      }
+    } catch(e){ /* keep the last baseline */ }
+  }
 
-    lastFeatures = ac.map(a=>({ type:"Feature",
-      geometry:{ type:"Point", coordinates:[a.lon, a.lat] },
-      properties:{ hex:a.hex, flight:a.flight, alt_baro:a.alt_baro, gs:a.gs,
-        type:a.type||"", cls:a.cls||"ok", squawk:a.squawk, sel:a.hex===selected } }));
-    lastSummary = {
-      total: d.total!=null ? d.total : ac.length,
-      mlat: d.mlat||0,
-      flagged: d.flagged||0,
-      emergency: d.emergency||0,
-      unverified: d.unverified||0,
-    };
+  // 2) Local detail when zoomed in; on empty or failure, fall back to the
+  //    baseline (clear local rather than show stale dots from another area).
+  if (zoomedIn) {
+    try {
+      const d = await fetchLive(viewportQuery());
+      const ac = d.aircraft || [];
+      localFeatures = ac.length ? toFeatures(ac) : [];
+    } catch(e){ localFeatures = []; }
+  } else {
+    localFeatures = [];
+  }
+
+  // 3) Render baseline + local merged; never blank while we have any data.
+  if (nationalFeatures.length || localFeatures.length) {
     refreshSel();
-    renderCounters(lastSummary);
-    renderAlerts(lastFeatures);
+    if (lastSummary) renderCounters(lastSummary);
+    const merged = mergedFeatures();
+    renderAlerts(merged);
+    // Convergence is additive: a failure here never breaks the trust layer or baseline.
+    try { renderConvergence(computeConvergence(merged)); } catch(e){ /* additive overlay */ }
     setStale(false);
     clearHiccup();
-  } catch(e){
-    // Keep the last good dots and counters; only dim them.
-    showHiccup("live feed hiccup: "+e.message+" (retrying)");
+  } else {
+    showHiccup("live feed warming up, retrying");
     setStale(true);
   }
 }
@@ -366,6 +575,299 @@ function showHiccup(msg){
 function clearHiccup(){
   document.getElementById("err").style.display="none";
 }
+
+/* ===== SKY CONVERGENCE: same owner, 2+ jets, one place, right now =========
+   Reads the precomputed REAL corporate control groups (/api/convergence, a pure
+   reader of site/data/convergence-groups.json, resolved in-workflow from the
+   Tensorust Ontology). Each group carries its member ADS-B hexes and its public-
+   record overlay (PAC, lobbying, awards). This intersects those groups against
+   the live national feed the map already holds and flags any group with 2+ of its
+   aircraft co-located now. Airline / charter / fractional / EMS / trust-held /
+   government groups are already filtered out upstream (routine co-location, noise).
+   Nothing is invented; a group with no PAC or lobbying simply shows none. Flag,
+   do not predict: a card means the jets are visibly co-located, not a forecast. */
+let convergeGroups = [];               // [{display, members:[{hex,tail}], pac, lobbying, awards_count}]
+let hexToGroup = new Map();            // "A0C82F" -> group index
+let convergeLoaded = false;
+
+async function loadConvergeGroups(){
+  try {
+    const r = await fetch("/api/convergence", { cache:"no-store" });
+    if (!r.ok) throw new Error("convergence "+r.status);
+    const d = await r.json();
+    convergeGroups = Array.isArray(d.groups) ? d.groups : [];
+    hexToGroup = new Map();
+    convergeGroups.forEach((g, gi) => {
+      (g.members || []).forEach(m => {
+        if (m.hex) hexToGroup.set(String(m.hex).toUpperCase(), gi);
+      });
+    });
+    convergeLoaded = true;
+  } catch(e){ /* keep whatever we had; empty state renders honestly */ }
+}
+
+// Intersect live tracks with the corporate groups, then cluster each group's live
+// aircraft by real proximity (connected components within CONVERGE_NM). A cluster
+// of 2+ is a convergence.
+function computeConvergence(features){
+  if (!convergeGroups.length) return [];
+  // live members per group
+  const liveByGroup = new Map();
+  for (const f of features){
+    const hex = f.properties && f.properties.hex;
+    if (!hex) continue;
+    const gi = hexToGroup.get(String(hex).toUpperCase());
+    if (gi == null) continue;
+    const [lon,lat] = f.geometry.coordinates;
+    if (lon == null || lat == null) continue;
+    const g = convergeGroups[gi];
+    const member = (g.members || []).find(m => String(m.hex).toUpperCase() === String(hex).toUpperCase()) || {};
+    if (!liveByGroup.has(gi)) liveByGroup.set(gi, []);
+    liveByGroup.get(gi).push({ hex:String(hex).toUpperCase(), lon, lat,
+      tail: member.tail || "", flight: (f.properties.flight||"").trim() });
+  }
+
+  const clusters = [];
+  for (const [gi, pts] of liveByGroup){
+    if (pts.length < 2) continue;
+    // connected components within CONVERGE_NM
+    const seen = new Array(pts.length).fill(false);
+    for (let i=0;i<pts.length;i++){
+      if (seen[i]) continue;
+      const comp=[i]; seen[i]=true;
+      for (let qi=0; qi<comp.length; qi++){
+        const a=pts[comp[qi]];
+        for (let j=0;j<pts.length;j++){
+          if (seen[j]) continue;
+          if (nmBetween(a.lon,a.lat,pts[j].lon,pts[j].lat) <= CONVERGE_NM){ seen[j]=true; comp.push(j); }
+        }
+      }
+      if (comp.length < 2) continue;
+      const members = comp.map(k=>pts[k]);
+      // centroid, and the member nearest it as the link anchor
+      const clon = members.reduce((s,m)=>s+m.lon,0)/members.length;
+      const clat = members.reduce((s,m)=>s+m.lat,0)/members.length;
+      let anchor=0, aBest=Infinity;
+      members.forEach((m,idx)=>{ const d=nmBetween(clon,clat,m.lon,m.lat); if(d<aBest){aBest=d;anchor=idx;} });
+      clusters.push({ gi, group:convergeGroups[gi], members, anchor,
+        center:[clon,clat], place:placeLabel(clon,clat) });
+    }
+  }
+  // biggest clusters first
+  clusters.sort((a,b)=> b.members.length - a.members.length);
+  return clusters;
+}
+
+function fmtMoneyShort(n){
+  const v = Number(n);
+  if (!isFinite(v) || v<=0) return null;
+  if (v >= 1e9) return "$"+(v/1e9).toFixed(1).replace(/\.0$/,"")+"B";
+  if (v >= 1e6) return "$"+(v/1e6).toFixed(1).replace(/\.0$/,"")+"M";
+  if (v >= 1e3) return "$"+Math.round(v/1e3)+"K";
+  return "$"+v.toLocaleString();
+}
+function cesc(s){ return String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+function updateConvergeSources(clusters){
+  const links = { type:"FeatureCollection", features:[] };
+  const halos = { type:"FeatureCollection", features:[] };
+  for (const cl of clusters){
+    const a = cl.members[cl.anchor];
+    cl.members.forEach((m,idx)=>{
+      halos.features.push({ type:"Feature", geometry:{ type:"Point", coordinates:[m.lon,m.lat] }, properties:{} });
+      if (idx !== cl.anchor){
+        links.features.push({ type:"Feature",
+          geometry:{ type:"LineString", coordinates:[[a.lon,a.lat],[m.lon,m.lat]] }, properties:{} });
+      }
+    });
+  }
+  if (map.getSource("converge-links")) map.getSource("converge-links").setData(links);
+  if (map.getSource("converge-halo"))  map.getSource("converge-halo").setData(halos);
+}
+
+function renderConvergence(clusters){
+  updateConvergeSources(clusters);
+  const list = document.getElementById("converge-list");
+  const empty = document.getElementById("converge-empty");
+  if (!list || !empty) return;
+  if (!clusters.length){
+    empty.style.display = "block";
+    empty.textContent = convergeLoaded
+      ? "Watching live tracks against the corporate ownership set. No control group has 2+ of its aircraft co-located right now."
+      : "Loading the corporate ownership set...";
+    list.innerHTML = "";
+    return;
+  }
+  empty.style.display = "none";
+  list.innerHTML = clusters.map((cl,i)=>{
+    const g = cl.group;
+    const n = cl.members.length;
+    const tails = cl.members.map(m => cesc(m.tail || m.hex)).join(", ");
+    const money = g.lobbying ? fmtMoneyShort(g.lobbying.total) : null;
+    const overlay = [];
+    if (g.pac && g.pac.id) overlay.push(`PAC ${cesc(g.pac.id)}`);
+    if (money) overlay.push(`<span class="amt">${money}</span> lobbying`);
+    if (g.awards_count) overlay.push(`${g.awards_count} federal award${g.awards_count>1?"s":""}`);
+    return `<div class="cgroup" data-i="${i}">`+
+      `<div class="owner">${cesc(g.display)}</div>`+
+      `<div class="conv">${n} jets converging ${cesc(cl.place)}</div>`+
+      `<div class="tails">${tails}</div>`+
+      (overlay.length?`<div class="overlay">${overlay.join(" &middot; ")}</div>`:"")+
+      `<div class="vis">Visible now &middot; public records</div>`+
+      `</div>`;
+  }).join("");
+  list.querySelectorAll(".cgroup").forEach(el=>{
+    el.addEventListener("click", ()=>{
+      const cl = clusters[parseInt(el.dataset.i,10)];
+      if (!cl) return;
+      map.flyTo({ center:cl.center, zoom:Math.max(map.getZoom(),7.2), speed:0.9 });
+    });
+  });
+}
+
+/* ===== GROUND LAYER: who-owns-your-street =================================
+   A search + browse drawer over /api/ground, a pure reader of the REAL ROAD
+   Act landlord data (site/data/landlords.json), resolved in-workflow from the
+   Tensorust Ontology. Address lookup returns the owner of record and the
+   control group behind it; the roster lists every institutional landlord the
+   county rolls surface. Coverage is 17 counties and that limit stays visible;
+   a miss is reported honestly, never guessed. ======================== */
+(function groundLayer(){
+  const el = (id) => document.getElementById(id);
+  const drawer = el("ground"), scrim = el("ground-scrim");
+  let rosterLoaded = false;
+  const esc = (s) => String(s==null?"":s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  const num = (n) => (n==null?"-":Number(n).toLocaleString());
+
+  function open(){
+    drawer.classList.add("on"); scrim.classList.add("on");
+    drawer.setAttribute("aria-hidden","false");
+    if (!rosterLoaded) loadRoster();
+    setTimeout(()=>{ const a=el("g-addr"); if(a) a.focus(); }, 280);
+  }
+  function close(){
+    drawer.classList.remove("on"); scrim.classList.remove("on");
+    drawer.setAttribute("aria-hidden","true");
+  }
+
+  el("ground-open").addEventListener("click", (e)=>{ e.preventDefault(); open(); });
+  el("ground-close").addEventListener("click", close);
+  scrim.addEventListener("click", close);
+  document.addEventListener("keydown", (e)=>{ if(e.key==="Escape" && drawer.classList.contains("on")) close(); });
+
+  // --- address search --------------------------------------------------------
+  async function search(){
+    const addr = el("g-addr").value.trim();
+    const zip = el("g-zip").value.trim();
+    const box = el("g-result");
+    if (!addr){ box.innerHTML=""; return; }
+    box.innerHTML = `<div class="gloading">Checking the rolls...</div>`;
+    try {
+      const qs = new URLSearchParams({ address: addr });
+      if (zip) qs.set("zip", zip);
+      const r = await fetch("/api/ground?"+qs.toString(), { cache:"no-store" });
+      const d = await r.json();
+      box.innerHTML = d.resolved ? hitCard(d) : missCard(d);
+    } catch(err){
+      box.innerHTML = `<div class="gcard miss"><div class="foot">Could not reach the ground reader. Try again.</div></div>`;
+    }
+  }
+  function hitCard(d){
+    const where = [d.matched && d.matched.address, d.county, d.state, d.matched && d.matched.zip]
+      .filter(Boolean).join(", ");
+    const flag = d.road_act_large_investor
+      ? `<div class="gflag">ROAD Act mega-investor</div>` : "";
+    return `<div class="gcard">
+      <div class="owner">Owner of record &middot; ${esc(d.owner_of_record)}</div>
+      <div class="ctrl">${esc(d.control_group || d.group)}</div>
+      <div class="addr">${esc(where)}${d.year_built?` &middot; built ${esc(d.year_built)}`:""}</div>
+      ${flag}
+      <div class="nums">
+        <div><div class="n">${num(d.group_homes_in_coverage)}</div><div class="l">homes in coverage</div></div>
+        <div><div class="n">${num(d.group_entities)}</div><div class="l">legal entities</div></div>
+      </div>
+      <div class="foot">${esc(d.note||"")}</div>
+    </div>`;
+  }
+  function missCard(d){
+    const counties = (d.covered_counties||[]).map(c=>`<span class="c">${esc(c)}</span>`).join("");
+    return `<div class="gcard miss">
+      <div class="ctrl" style="font-size:13px">Not in the indexed set</div>
+      <div class="foot" style="border-top:none;padding-top:0;margin-top:2px">${esc(d.note||"")}</div>
+      ${counties?`<div class="dl" style="font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin:10px 0 5px">Covered counties</div><div class="gcounty">${counties}</div>`:""}
+    </div>`;
+  }
+  el("g-go").addEventListener("click", search);
+  el("g-addr").addEventListener("keydown", (e)=>{ if(e.key==="Enter") search(); });
+  el("g-zip").addEventListener("keydown", (e)=>{ if(e.key==="Enter") search(); });
+  // example link: prefill + search
+  const ghint = document.querySelector(".ghint a[data-ex]");
+  if (ghint) ghint.addEventListener("click", (e)=>{
+    e.preventDefault();
+    const [a,z] = ghint.getAttribute("data-ex").split("|");
+    el("g-addr").value = a; el("g-zip").value = z || ""; search();
+  });
+
+  // --- roster (browse) -------------------------------------------------------
+  async function loadRoster(){
+    rosterLoaded = true;
+    const host = el("g-roster");
+    try {
+      const r = await fetch("/api/ground", { cache:"no-store" });
+      const d = await r.json();
+      host.innerHTML = renderRoster(d);
+      wireRows(host);
+    } catch(err){
+      rosterLoaded = false;
+      host.innerHTML = `<div class="gloading">Could not load the roster. Reopen to retry.</div>`;
+    }
+  }
+  function renderRoster(d){
+    const m = d.meta || {};
+    const counties = (d.covered_counties||[]).map(c=>`<span class="c">${esc(c.county)}, ${esc(c.state)}</span>`).join("");
+    const groups = (d.groups||[]).slice().sort((a,b)=>(b.homes_in_coverage||0)-(a.homes_in_coverage||0));
+    const rows = groups.map((g,i)=>groupRow(g,i)).join("");
+    const nGroups = (m.counts && m.counts.all_covered_groups) || (d.all_covered_groups||[]).length;
+    return `
+      <div class="gsec-label"><span>Institutional landlords</span><span>homes in coverage</span></div>
+      ${rows}
+      <div class="gsec-label" style="margin-top:20px">Covered counties</div>
+      <div class="gcounty">${counties}</div>
+      <div class="gfoot-note">
+        ${esc(m.coverage_note||"")}<br><br>
+        ${nGroups?`The monitor surfaces <b>${num(nGroups)}</b> covered groups across these counties; the ${groups.length} largest institutional rental owners are detailed above.<br><br>`:""}
+        Rule: ${esc(m.rule||"")} Monitor as of ${esc((m.monitor_as_of||"").slice(0,10))}. What the public rolls show, not a forecast or a claim of wrongdoing.
+      </div>`;
+  }
+  function groupRow(g,i){
+    const flag = g.road_act_large_investor ? ` &middot; <span style="color:#ff6a7f">ROAD Act</span>` : "";
+    const ents = (g.top_entities||[]).map(e=>{
+      const m = String(e).match(/^(.*)\((\d[\d,]*)\)\s*$/);
+      return m ? `<div class="ent">${esc(m[1].trim())} <span>${num(Number(m[2].replace(/,/g,"")))} homes</span></div>`
+               : `<div class="ent">${esc(e)}</div>`;
+    }).join("");
+    const samp = (g.sample_addresses||[]).map(s=>
+      `<div class="samp">${esc(s.address)}, ${esc(s.zip)} &middot; ${esc(s.county)}, ${esc(s.state)}${s.year_built?` &middot; ${esc(s.year_built)}`:""}<span class="o">owner of record: ${esc(s.owner_of_record)}</span></div>`
+    ).join("");
+    return `<div class="grow" data-i="${i}">
+      <div class="gr-top">
+        <div class="gr-name">${esc(g.label)}</div>
+        <div class="gr-homes">${num(g.homes_in_coverage)}</div>
+      </div>
+      <div class="gr-meta">${esc(g.control_group||"")} &middot; ${num(g.legal_entities)} entities${flag}</div>
+      <div class="gr-detail">
+        ${g.note?`<div class="gr-note">${esc(g.note)}</div>`:""}
+        ${ents?`<div class="dl">Largest holding entities</div>${ents}`:""}
+        ${samp?`<div class="dl">Sample parcels on the roll</div>${samp}`:""}
+      </div>
+    </div>`;
+  }
+  function wireRows(host){
+    host.querySelectorAll(".grow").forEach(row=>{
+      row.addEventListener("click", ()=> row.classList.toggle("open"));
+    });
+  }
+})();
 </script>
 </body>
 </html>

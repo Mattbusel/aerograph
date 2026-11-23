@@ -58,6 +58,7 @@ export default async function handler(req, res) {
       parent: record.parent || null,
       awards: Array.isArray(record.awards) ? record.awards : [],
       lobbying: record.lobbying || null,
+      pac: record.pac || null,
       sources: Array.isArray(record.sources) ? record.sources : [],
       resolved_at: record.resolved_at || null,
       note: record.note || "Ownership and control from public records. Not a claim about this flight.",

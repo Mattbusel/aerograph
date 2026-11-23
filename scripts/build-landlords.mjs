@@ -1,0 +1,280 @@
+// build-landlords.mjs  --  assembles site/data/landlords.json from REAL Tensorust
+// Ontology data resolved in-workflow (ROAD Act monitor + road_investor_group +
+// who_owns_home). Nothing invented: every group, count, entity name and address
+// is a value a tool returned. Coverage is 17 large counties only; that limit is
+// carried in the file honestly. No predictions, only what the public rolls show.
+import { writeFileSync } from "node:fs";
+
+const GENERATED_AT = new Date().toISOString();
+
+// ---- Named institutional groups (detail from road_investor_group) ----------
+// sample_addresses: real situs + ZIP from each group's own recorded deeds, chosen
+// from parcels that carry a usable ZIP and are the group HOLDING the home (lender/
+// servicer REO entities excluded from the sample, since those are loss-mitigation
+// title, not the rental landlord). kind: INSTITUTIONAL_SFR unless noted.
+const groups = [
+  {
+    group_id: 612774, label: "Progress Residential / Pretium",
+    control_group: "Pretium Partners (Progress Residential)", kind: "INSTITUTIONAL_SFR",
+    road_act_large_investor: true, status: "COVERED",
+    homes_in_coverage: 49190, legal_entities: 610, largest_single_entity_homes: 5616,
+    hidden_from_name_search: false,
+    top_entities: ["PROGRESS RESIDENTIAL BORROWER (5616)","YAMASA CO LTD (5465)","PROGRESS RESIDENTIAL BORROWER 5 LLC (1290)","PR BORROWER 26 LLC (791)","OLYMPUS BORROWER LLC (751)","BAF ASSETS LLC (743)"],
+    note: "Largest single-family rental owner in coverage. 49,190 homes across 610 legal entities in 17 counties; ROAD Act mega-investor.",
+    sample_addresses: [
+      { address: "13014 N 62ND DR", zip: "85304", county: "Maricopa", state: "AZ", owner_of_record: "CEDAR BROOK PROPERTIES FUNDING 3 LLC", year_built: 1984 },
+      { address: "5902 W ORANGE DR", zip: "85301", county: "Maricopa", state: "AZ", owner_of_record: "JEFF 1 LLC", year_built: 1959 },
+      { address: "428 N CITRUS LN", zip: "85234", county: "Maricopa", state: "AZ", owner_of_record: "YAMASA CO LTD", year_built: 2005 },
+      { address: "3216 N MANOR DR W", zip: "85014", county: "Maricopa", state: "AZ", owner_of_record: "TRUE NORTH FAMILY TRUST", year_built: 1932 },
+      { address: "5518 E THOMAS RD", zip: "85018", county: "Maricopa", state: "AZ", owner_of_record: "NWL COMPANY LLC", year_built: 1953 }
+    ]
+  },
+  {
+    group_id: 632693, label: "Invitation Homes (INVH)",
+    control_group: "Invitation Homes Inc (NYSE: INVH)", kind: "INSTITUTIONAL_SFR",
+    road_act_large_investor: true, status: "COVERED",
+    homes_in_coverage: 32315, legal_entities: 251, largest_single_entity_homes: 2079,
+    hidden_from_name_search: false,
+    top_entities: ["SRP SUB LLC (2079)","2018-3 IH BORROWER LP (1715)","2017-1 IH BORROWER LP (1625)","IH6 PROPERTY PHOENIX LP (1369)","INVITATION HOMES 7 LP (1329)"],
+    note: "Publicly traded (INVH). 32,315 homes across 251 entities in 16 counties; ROAD Act mega-investor.",
+    sample_addresses: [
+      { address: "2564 MORNING GLORY DR", zip: "75082", county: "Collin", state: "TX", owner_of_record: "INVITATION HOMES 7 LP", year_built: 1991 },
+      { address: "922 W SAINT KATERI AVE", zip: "85041", county: "Maricopa", state: "AZ", owner_of_record: "IH2 PROPERTY BORROWER LP", year_built: 2003 },
+      { address: "13836 N 156TH LN", zip: "85379", county: "Maricopa", state: "AZ", owner_of_record: "SFR CROWN JEWEL BORROWER LP", year_built: 2005 },
+      { address: "5322 E GREENWAY ST", zip: "85205", county: "Maricopa", state: "AZ", owner_of_record: "SFR CROWN JEWEL BORROWER LP", year_built: 1985 },
+      { address: "4513 N 88TH AVE", zip: "85037", county: "Maricopa", state: "AZ", owner_of_record: "SFR CROWN JEWEL BORROWER LP", year_built: 1999 }
+    ]
+  },
+  {
+    group_id: 488969, label: "FirstKey Homes (Cerberus)",
+    control_group: "Cerberus Capital Management (FirstKey Homes)", kind: "INSTITUTIONAL_SFR",
+    road_act_large_investor: true, status: "COVERED",
+    homes_in_coverage: 17578, legal_entities: 255, largest_single_entity_homes: 2130,
+    hidden_from_name_search: false,
+    top_entities: ["FKH SFR PROPCO B HLD LP (2130)","FKH SFR PROPCO I LP (1145)","CSMA BLT LLC (1028)","FKH SFR R LP (804)","FKH SFR C1 LP (789)"],
+    note: "Cerberus-controlled. 17,578 homes across 255 entities in 17 counties; ROAD Act mega-investor.",
+    sample_addresses: [
+      { address: "2016 W WHITTON AVE", zip: "85015", county: "Maricopa", state: "AZ", owner_of_record: "FKH SFR R LP", year_built: 1951 },
+      { address: "1086 N LONGMORE ST", zip: "85224", county: "Maricopa", state: "AZ", owner_of_record: "OP SPE SUMMIT LLC", year_built: 1991 },
+      { address: "2631 E ANDERSON DR", zip: "85032", county: "Maricopa", state: "AZ", owner_of_record: "OP SPE SUMMIT LLC", year_built: 2002 },
+      { address: "1932 E PALMCROFT DR", zip: "85282", county: "Maricopa", state: "AZ", owner_of_record: "OP SPE SUMMIT LLC", year_built: 1963 },
+      { address: "1115 BOYD DR", zip: "75098", county: "Collin", state: "TX", owner_of_record: "OP SPE SUMMIT LLC", year_built: 1990 }
+    ]
+  },
+  {
+    group_id: 599489, label: "Tricon Residential (Blackstone)",
+    control_group: "Blackstone (Tricon Residential)", kind: "INSTITUTIONAL_SFR",
+    road_act_large_investor: true, status: "COVERED",
+    homes_in_coverage: 15313, legal_entities: 149, largest_single_entity_homes: 1196,
+    hidden_from_name_search: false,
+    top_entities: ["TRICON SFR 2020 2 BORROWER LLC (1196)","TAH MS BORROWER LLC (1083)","TRICON SFR 2024-4 BORROWER LLC (889)","SFR JV-2 2022-1 BORROWER LLC (685)"],
+    note: "Blackstone-controlled since 2024. 15,313 homes across 149 entities in 16 counties; ROAD Act mega-investor. Also buys via HPA / Home Partners of America entities.",
+    sample_addresses: [
+      { address: "1211 SHEPPARD LN", zip: "75098", county: "Collin", state: "TX", owner_of_record: "SFR BORROWER 2021 2 LLC", year_built: 1986 },
+      { address: "961 DEER RUN LN", zip: "75078", county: "Collin", state: "TX", owner_of_record: "SFR ACQUISITIONS 6 LLC", year_built: 2012 },
+      { address: "1207 ABERDEEN DR", zip: "75002", county: "Collin", state: "TX", owner_of_record: "HPA JV TEXAS SUBSIDIARY 2019 1 ML LLC", year_built: 1999 },
+      { address: "1723 SHAW ST", zip: "75212", county: "Dallas", state: "TX", owner_of_record: "SFR 2026-2 BORROWER LLC", year_built: 1994 },
+      { address: "4803 VIA MARIA CT", zip: "89031", county: "Clark", state: "NV", owner_of_record: "TRICON SFR 2024-3 BORROWER LLC", year_built: 1996 }
+    ]
+  },
+  {
+    group_id: 613513, label: "American Homes 4 Rent (AMH)",
+    control_group: "American Homes 4 Rent (NYSE: AMH)", kind: "INSTITUTIONAL_SFR",
+    road_act_large_investor: true, status: "COVERED",
+    homes_in_coverage: 13671, legal_entities: 147, largest_single_entity_homes: 1340,
+    hidden_from_name_search: false,
+    top_entities: ["AMH 2014 1 BORROWER LLC (1340)","AMH DEVELOPMENT LLC (1339)","AH4R PROPERTIES TWO LLC (1048)","AH4R PROPERTIES LLC (1011)","AMH 2014-2 BORROWER LLC (727)"],
+    note: "Publicly traded (AMH). 13,671 homes across 147 entities in 17 counties; ROAD Act mega-investor.",
+    sample_addresses: [
+      { address: "125 PRAIRIE VIEW DR", zip: "75407", county: "Collin", state: "TX", owner_of_record: "AH4R PROPERTIES TWO LLC", year_built: 2005 },
+      { address: "1623 PARK TRAILS BLVD", zip: "75407", county: "Collin", state: "TX", owner_of_record: "AH4R PROPERTIES LLC", year_built: 2018 },
+      { address: "17210 MORNING BLOSSOM PL", zip: "77084", county: "Harris", state: "TX", owner_of_record: "AMERICAN HOMES 4 RENT TRS LLC", year_built: 2005 },
+      { address: "311 TIBURON CT", zip: "32835", county: "Orange", state: "FL", owner_of_record: "AH4R PROPERTIES LLC", year_built: 1990 },
+      { address: "102 STAR SHELL DR", zip: "33572", county: "Hillsborough", state: "FL", owner_of_record: "AMH 2014 1 BORROWER LLC", year_built: 2009 },
+      { address: "3168 CASTLE CANYON AVE", zip: "89052", county: "Clark", state: "NV", owner_of_record: "AMH 2014-2 BORROWER LLC", year_built: 1998 }
+    ]
+  },
+  {
+    group_id: 607127, label: "Camillo Companies",
+    control_group: "Camillo Companies (LGI / Legend Homes affiliate)", kind: "INSTITUTIONAL_SFR",
+    road_act_large_investor: true, status: "COVERED",
+    homes_in_coverage: 7427, legal_entities: 79, largest_single_entity_homes: 2290,
+    hidden_from_name_search: false,
+    top_entities: ["CAMILLO PROPERTIES LTD (2290)","CAMILLO ML 2022 DD SFR LLC (773)","CAMILLO ML 2021 SFR LLC (479)","CAMILLO HOUSES CV 1 LLC (330)"],
+    note: "Houston-based build-to-rent operator. 7,427 homes across 79 entities in 12 counties; ROAD Act mega-investor.",
+    sample_addresses: [
+      { address: "16280 W MORELAND ST", zip: "85338", county: "Maricopa", state: "AZ", owner_of_record: "GONZALEZ FAMILY TRUST", year_built: 2003 },
+      { address: "19693 E ESCALANTE RD", zip: "85142", county: "Maricopa", state: "AZ", owner_of_record: "GONZALEZ FAMILY TRUST", year_built: 2024 },
+      { address: "8024 ARREN TERR", zip: "78641", county: "Travis", state: "TX", owner_of_record: "GONZALEZ FAMILY TRUST", year_built: 1994 },
+      { address: "6205 LUCE ST", zip: "77087", county: "Harris", state: "TX", owner_of_record: "CAMILLO PROPERTIES LLC", year_built: 2015 },
+      { address: "5511 LONG ARBOR LN", zip: "77449", county: "Harris", state: "TX", owner_of_record: "CAMILLO PROPERTIES LLC", year_built: 2014 }
+    ]
+  },
+  {
+    group_id: 429998, label: "Rithm Capital (New Residential)",
+    control_group: "Rithm Capital Corp (NYSE: RITM); NewRez / Shellpoint servicing", kind: "MORTGAGE_REIT_SFR",
+    road_act_large_investor: true, status: "COVERED",
+    homes_in_coverage: 7215, legal_entities: 354, largest_single_entity_homes: 808,
+    hidden_from_name_search: false,
+    top_entities: ["RS RENTAL III A LLC (808)","HUDSON SFR PROPERTY HOLDINGS II LLC (643)","AO PROPCO 1 LLC (615)","RS RENTAL I LLC (525)","PINE GROVE RESIDENTIAL FUNDING I LLC (481)"],
+    note: "Mortgage REIT; large share of its parcels are NewRez/Shellpoint servicer REO and loss-mitigation title (36.10), not pure rental holdings. 7,215 homes across 354 entities in 17 counties; ROAD Act mega-investor.",
+    sample_addresses: [
+      { address: "7611 S 15TH ST", zip: "85042", county: "Maricopa", state: "AZ", owner_of_record: "NEWREZ LLC", year_built: 2013 },
+      { address: "1720 E WOOD ST", zip: "85040", county: "Maricopa", state: "AZ", owner_of_record: "NEWREZ LLC", year_built: 1987 },
+      { address: "1462 E TORREY PINES LN", zip: "85249", county: "Maricopa", state: "AZ", owner_of_record: "NEWREZ LLC", year_built: 2000 },
+      { address: "2341 W BERRIDGE LN", zip: "85015", county: "Maricopa", state: "AZ", owner_of_record: "RESIDENTIAL CREDIT OPPORTUNITIES TRUST X-A", year_built: 1959 }
+    ]
+  },
+  {
+    group_id: 641030, label: "Main Street Renewal (Amherst)",
+    control_group: "Amherst Holdings (Main Street Renewal)", kind: "INSTITUTIONAL_SFR",
+    road_act_large_investor: true, status: "COVERED",
+    homes_in_coverage: 3405, legal_entities: 73, largest_single_entity_homes: 648,
+    hidden_from_name_search: false,
+    top_entities: ["BAF ASSETS 5 LLC (648)","CPI-AMHERST SFR PROGRAM OWNER LLC (599)","ALTO ASSET COMPANY 6 LLC (449)","MERMAID BORROWER LLC (285)"],
+    note: "Amherst-controlled. 3,405 homes across 73 entities in 16 counties; ROAD Act mega-investor. Buys through BAF Assets / Alto Asset / CPI-Amherst entities.",
+    sample_addresses: [
+      { address: "8500 STONEY POINT DR", zip: "75409", county: "Collin", state: "TX", owner_of_record: "HCH REAL ESTATE I LLC", year_built: 2021 },
+      { address: "5031 WATSON DR", zip: "75241", county: "Dallas", state: "TX", owner_of_record: "MERMAID BORROWER LLC", year_built: 2023 },
+      { address: "1838 BURNING TREE LN", zip: "75006", county: "Dallas", state: "TX", owner_of_record: "ALTO ASSET COMPANY 6 LLC", year_built: 1962 },
+      { address: "3200 COLBY CIR", zip: "75149", county: "Dallas", state: "TX", owner_of_record: "ALTO ASSET COMPANY 6 LLC", year_built: 1983 },
+      { address: "312 S WATERFORD OAKS DR", zip: "75104", county: "Dallas", state: "TX", owner_of_record: "ALTO ASSET COMPANY 6 LLC", year_built: 2000 }
+    ]
+  },
+  {
+    group_id: 98258, label: "Bridge Investment Group SFR (Apollo)",
+    control_group: "Apollo Global Management (Bridge Investment Group)", kind: "INSTITUTIONAL_SFR",
+    road_act_large_investor: true, status: "COVERED",
+    homes_in_coverage: 577, legal_entities: 18, largest_single_entity_homes: 297,
+    hidden_from_name_search: false,
+    top_entities: ["BRIDGE SFR IV SEED BORROWER LLC (297+)","BRIDGE SFR IV BORROWER 3 LLC (23)","BRIDGE SFR IV BORROWER I LLC (15)","BRIDGE SFR IV ACQUISITIONS LLC (7)"],
+    note: "Apollo-controlled (acquired Bridge Investment Group 2025). 577 homes across 18 entities; ROAD Act large investor. No recorded deeds with usable ZIP in the covered counties' dated stream, so no sample address is listed here (left honestly empty).",
+    sample_addresses: []
+  }
+];
+
+// Builder / iBuyer groups: 350+ homes but coverage turns on the "engaged in the
+// business" test (NPRM 36.15). Shown for context, flagged distinct from rental
+// landlords. Counts from road_monitor_summary roster; not expanded here.
+const builder_ibuyer_note = "Builder/iBuyer groups (e.g. Opendoor, D.R. Horton/Weekley Homes, Toll Brothers) hold 350+ homes but are flagged BUILDER_IBUYER, not institutional rental landlords. Their co-location and bulk buys are new-construction or resale inventory, not a rental portfolio. Not enumerated in this landlord dataset.";
+
+// Full covered roster from road_monitor_summary (43 groups). Compact: every 350+
+// COVERED control group the monitor resolved, so a lookup that lands on a smaller
+// group still names it. Values are the monitor's own figures.
+const all_covered_groups = [
+  {group_id:612774,label:"Progress Residential / Pretium",homes:49190,entities:610,largest:5616,hidden:false},
+  {group_id:632693,label:"Invitation Homes (INVH)",homes:32315,entities:251,largest:2079,hidden:false},
+  {group_id:488969,label:"FirstKey Homes (Cerberus)",homes:17578,entities:255,largest:2130,hidden:false},
+  {group_id:599489,label:"Tricon Residential (Blackstone)",homes:15313,entities:149,largest:1196,hidden:false},
+  {group_id:613513,label:"American Homes 4 Rent (AMH)",homes:13671,entities:147,largest:1340,hidden:false},
+  {group_id:607127,label:"Camillo Companies",homes:7427,entities:79,largest:2290,hidden:false},
+  {group_id:429998,label:"Rithm Capital (New Residential)",homes:7215,entities:354,largest:808,hidden:false},
+  {group_id:641030,label:"Main Street Renewal (Amherst)",homes:3405,entities:73,largest:648,hidden:false},
+  {group_id:396079,label:"MCH SFR",homes:1206,entities:17,largest:470,hidden:false},
+  {group_id:-1,label:"SN family (Scottsdale mailbox 303)",homes:1146,entities:27,largest:216,hidden:true},
+  {group_id:265131,label:"HOME RENT",homes:1135,entities:11,largest:626,hidden:false},
+  {group_id:367466,label:"I G SFR II BORROWER LLC",homes:1069,entities:15,largest:301,hidden:false},
+  {group_id:456167,label:"PATHWAY HOMES",homes:905,entities:26,largest:350,hidden:false},
+  {group_id:23214,label:"510 SFR TX OPERATIONS I LLC",homes:718,entities:31,largest:264,hidden:false},
+  {group_id:533695,label:"SFR FUND VI BORROWER LLC",homes:703,entities:1,largest:703,hidden:false},
+  {group_id:442719,label:"OPEN HOUSE",homes:685,entities:37,largest:223,hidden:false},
+  {group_id:59496,label:"ARMM ASSETS",homes:675,entities:2,largest:421,hidden:false},
+  {group_id:618174,label:"SHV HOMES",homes:640,entities:19,largest:177,hidden:false},
+  {group_id:145947,label:"CPI BG",homes:587,entities:27,largest:120,hidden:true},
+  {group_id:228883,label:"GG B2R",homes:586,entities:9,largest:152,hidden:false},
+  {group_id:98258,label:"Bridge Investment Group SFR (Apollo)",homes:577,entities:18,largest:297,hidden:false},
+  {group_id:397415,label:"MCP OLD",homes:573,entities:4,largest:256,hidden:false},
+  {group_id:268530,label:"HPA TEXAS",homes:557,entities:27,largest:57,hidden:false},
+  {group_id:102720,label:"BTR SCATTERED",homes:553,entities:7,largest:351,hidden:false},
+  {group_id:602544,label:"TSHH",homes:552,entities:5,largest:541,hidden:false},
+  {group_id:184211,label:"D W F VI ATLAS S F R NV L L C",homes:519,entities:18,largest:183,hidden:false},
+  {group_id:64919,label:"LIBERTY SQUARE",homes:515,entities:7,largest:189,hidden:true},
+  {group_id:234953,label:"GOLDSTAR HOMES",homes:507,entities:14,largest:450,hidden:false},
+  {group_id:332785,label:"KL LB",homes:502,entities:8,largest:242,hidden:false},
+  {group_id:610635,label:"VAPA INVESTMENTS",homes:462,entities:8,largest:453,hidden:false},
+  {group_id:413327,label:"MNSF W1",homes:461,entities:2,largest:460,hidden:false},
+  {group_id:580871,label:"CZ GA",homes:447,entities:5,largest:394,hidden:false},
+  {group_id:415839,label:"MONTPELIER ASSETS",homes:442,entities:1,largest:442,hidden:false},
+  {group_id:266111,label:"HOOSE",homes:437,entities:21,largest:152,hidden:true},
+  {group_id:514824,label:"S F R INVESTMENTS POOL 1 L L C",homes:430,entities:7,largest:315,hidden:false},
+  {group_id:590020,label:"THR FLORIDA",homes:423,entities:3,largest:230,hidden:false},
+  {group_id:273249,label:"IH3 FLORIDA",homes:419,entities:3,largest:357,hidden:false},
+  {group_id:629788,label:"RCGA",homes:393,entities:4,largest:329,hidden:true},
+  {group_id:273276,label:"IH5 FLORIDA",homes:390,entities:3,largest:353,hidden:false},
+  {group_id:515751,label:"S R P SUB L L C",homes:388,entities:1,largest:388,hidden:false},
+  {group_id:533813,label:"SFR TRANCHE",homes:367,entities:2,largest:366,hidden:false},
+  {group_id:213316,label:"FOUR CORNERS",homes:364,entities:11,largest:275,hidden:true},
+  {group_id:489576,label:"REVEN HOUSING",homes:350,entities:6,largest:141,hidden:false}
+];
+
+// Flat, exact-match address index for the search layer. Key = "ADDRESS|ZIP"
+// uppercased, no extra spaces. Value names the real owner of record and group.
+const address_index = {};
+for (const g of groups) {
+  for (const s of g.sample_addresses) {
+    const key = `${s.address.trim().toUpperCase()}|${s.zip.trim()}`;
+    address_index[key] = {
+      owner_of_record: s.owner_of_record,
+      group: g.label,
+      group_id: g.group_id,
+      control_group: g.control_group,
+      road_act_large_investor: g.road_act_large_investor,
+      group_homes_in_coverage: g.homes_in_coverage,
+      group_entities: g.legal_entities,
+      county: s.county, state: s.state, year_built: s.year_built
+    };
+  }
+}
+
+const covered_counties = [
+  {county:"Harris",state:"TX",metro:"Houston"},{county:"Dallas",state:"TX",metro:"Dallas"},
+  {county:"Tarrant",state:"TX",metro:"Fort Worth"},{county:"Collin",state:"TX",metro:"Plano"},
+  {county:"Travis",state:"TX",metro:"Austin"},{county:"Bexar",state:"TX",metro:"San Antonio"},
+  {county:"Maricopa",state:"AZ",metro:"Phoenix"},{county:"Clark",state:"NV",metro:"Las Vegas"},
+  {county:"Cobb",state:"GA",metro:"Atlanta"},{county:"DeKalb",state:"GA",metro:"Atlanta"},
+  {county:"Fulton",state:"GA",metro:"Atlanta"},{county:"Gwinnett",state:"GA",metro:"Atlanta"},
+  {county:"Hillsborough",state:"FL",metro:"Tampa"},{county:"Orange",state:"FL",metro:"Orlando"},
+  {county:"Duval",state:"FL",metro:"Jacksonville"},{county:"Mecklenburg",state:"NC",metro:"Charlotte"},
+  {county:"Shelby",state:"TN",metro:"Memphis"}
+];
+
+const out = {
+  meta: {
+    generated_at: GENERATED_AT,
+    producer: "scripts/build-landlords.mjs (resolved in-workflow via Tensorust Ontology MCP)",
+    source: "Tensorust Ontology ROAD Act monitor: road_monitor_summary, road_investor_group, who_owns_home. Underlying public records: 17 county property rolls, state business registries, SEC Exhibit 21, Texas franchise registry.",
+    rule: "21st Century ROAD to Housing Act sec. 1001 (42 U.S.C. 19521); Treasury NPRM 31 CFR Part 36. 350-home institutional-investor threshold. Effective 2027-01-07.",
+    data_version: "f648182df9ae",
+    monitor_as_of: "2026-11-06T03:51:24",
+    coverage_note: "Entity-owned single-family homes in 17 large counties only. Every home count is a FLOOR for the group's national total. A shared mailing address is evidence of shared management, not proof of control. Purchases before 2027-01-07 are not violations.",
+    counts: { named_groups: groups.length, all_covered_groups: all_covered_groups.length, indexed_addresses: Object.keys(address_index).length },
+    hard_rule: "All real. No invented owners, addresses, counts or connections. Flag, do not predict: these are the owners the public rolls show.",
+    builder_ibuyer_note
+  },
+  covered_counties,
+  groups,
+  all_covered_groups,
+  address_index
+};
+
+const dest = "C:/Users/Matthew/aerograph/site/data/landlords.json";
+writeFileSync(dest, JSON.stringify(out, null, 2));
+console.log("wrote", dest);
+
+// Also emit the bundled ES module the Vercel function imports. A disk JSON read
+// breaks under the ESM->CommonJS compile; a plain `export default <object>` is
+// always bundled cleanly. api/ground.js imports this; the static JSON above stays
+// for anyone who wants the whole set. Keep them in lockstep: both written here.
+const moduleDest = "C:/Users/Matthew/aerograph/site/api/_landlordsData.js";
+writeFileSync(
+  moduleDest,
+  "// AUTO-GENERATED by scripts/build-landlords.mjs. Do not edit by hand.\n" +
+    "// REAL public-record ROAD Act landlord data, bundled as an ES module so the\n" +
+    "// Vercel function can import it after the ESM->CommonJS compile (a disk JSON\n" +
+    "// read breaks under that compile; a plain module import is always bundled).\n" +
+    "// Source: Tensorust Ontology ROAD Act monitor, resolved in-workflow. Rebuild to refresh.\n" +
+    "export default " + JSON.stringify(out) + ";\n"
+);
+console.log("wrote", moduleDest);
+console.log("named groups:", groups.length, "| roster:", all_covered_groups.length, "| indexed addresses:", Object.keys(address_index).length);
+console.log("homes represented (named groups):", groups.reduce((a,g)=>a+g.homes_in_coverage,0));

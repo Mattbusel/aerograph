@@ -1,0 +1,80 @@
+{
+ "meta": {
+  "generated_at": "2026-11-23T05:11:45.558Z",
+  "producer": "scripts/build-convergence.mjs",
+  "source": "site/data/attribution.json (real public-record attribution)",
+  "note": "Corporate / private control groups with 2+ attributed aircraft. The live intersection and co-location test run client-side against the national ADS-B feed. Suppressed: airline, charter/fractional, EMS, owner-trustee, government (their co-location is routine noise, not a deal). Flag, do not predict: a surfaced group means 2+ of its aircraft are visibly co-located now, nothing more.",
+  "attribution_count": 153,
+  "surfaced_groups": 1,
+  "suppressed_groups": {
+   "trustee": 7,
+   "airline": 8,
+   "ems": 5,
+   "government": 13,
+   "charter_fractional": 3
+  }
+ },
+ "groups": [
+  {
+   "key": "WALMART INC",
+   "display": "WALMART INC",
+   "class": "corporate",
+   "surface": true,
+   "reason": "corporate / private operator",
+   "pac": {
+    "name": "WALMART INC. PAC FOR RESPONSIBLE GOVERNMENT",
+    "id": "C00093054"
+   },
+   "lobbying": {
+    "total": 17217000,
+    "issues": "TRD, TAX, CSP, LAW, BAN, HCR, LBR, FOO",
+    "periods": "2025 Q1, 2025 Q2, 2025 Q3, 2025 Q4, 2026 Q1, 2026 Q2, 2026 Q3",
+    "firms": 13,
+    "firm_names": [
+     "MEHLMAN CONSULTING, INC.",
+     "THE NICKLES GROUP, LLC",
+     "CAPITOL COUNSEL LLC"
+    ]
+   },
+   "awards_count": 0,
+   "members": [
+    {
+     "hex": "A0C82F",
+     "tail": "N15DP",
+     "owner": "WALMART INC",
+     "model": "TEXTRON AVIATION INC 680"
+    },
+    {
+     "hex": "A0EF95",
+     "tail": "N16CP",
+     "owner": "WALMART INC",
+     "model": "TEXTRON AVIATION INC 680"
+    },
+    {
+     "hex": "A11921",
+     "tail": "N17ZP",
+     "owner": "WALMART INC",
+     "model": "TEXTRON AVIATION INC 680"
+    },
+    {
+     "hex": "A57061",
+     "tail": "N45GH",
+     "owner": "WALMART INC",
+     "model": "LEARJET INC 45"
+    },
+    {
+     "hex": "A5707C",
+     "tail": "N45HK",
+     "owner": "WALMART INC",
+     "model": "LEARJET INC 45"
+    },
+    {
+     "hex": "ADC192",
+     "tail": "N986BL",
+     "owner": "WALMART INC",
+     "model": "LEARJET INC 45"
+    }
+   ]
+  }
+ ]
+}

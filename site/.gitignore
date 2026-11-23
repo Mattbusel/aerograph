@@ -1,3 +1,6 @@
 .vercel
 data/_staged-tails.json
 data/_resolved.json
+
+data/_batch.json
+data/_candidates.json
